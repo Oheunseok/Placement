@@ -1,0 +1,17 @@
+{
+	"collapeV" : 100,
+	"collapeA" : 80,
+	"rotateV" : 10,
+	"rotateA" : 0.5,
+	 "collapsex":0, "collapey" : 0 ,
+    "meltsize" : 16,
+    "movespeed" : 800,
+    "moveA" : 400,
+    "melt_first_V" : 10,
+    "meltA" : 200,
+	"scalesize" : 0.1,
+	"duplicatesize" : 5,
+	"Friction" : 20,
+"dilicateA" : 200
+	
+}
