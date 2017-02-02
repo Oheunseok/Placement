@@ -1,7 +1,12 @@
 from pico2d import*
 import json
 import random
-
+etc_file = open('json\\Gamesystem.txt','r')                                                                 #제이슨 파일 불러오기
+etc_data = json.load(etc_file)
+etc_file.close()
+logo_time = 0.03
+gamesizex=int(etc_data["gamesize"])                                                                               #제이슨 파일에서 게임 크기 지정
+gamesizey=(int)(etc_data["gamesize"]/4*3)                                                                         #4:3비율
 
 
 class vector:
@@ -25,6 +30,63 @@ class vector:
 class POINT(Structure):
     _fields_ = [("x",c_long),("y",c_long)]
 
+class vector2d:
+    def __init__(self):
+        self.x,self.y = 0,0
+
+class oobb:
+    def __init__(self):
+        self.xpos,self.ypos = 600,600
+        self.a = [vector2d(),vector2d(),vector2d(),vector2d()]
+        self.extent_x,self.extent_y =100 ,50
+        self.m_rotation = 0
+        self.tempRU , self.tempRD = vector2d(),vector2d()
+        self.a[0].x,self.a[0].y = self.xpos + self.extent_x,self.ypos +self.extent_y
+        self.a[1].x, self.a[1].y = self.xpos + self.extent_x, self.ypos - self.extent_y
+        self.a[2].x, self.a[2].y = self.xpos - self.extent_x, self.ypos - self.extent_y
+        self.a[3].x, self.a[3].y = self.xpos - self.extent_x, self.ypos + self.extent_y
+
+    def update(self,x1,y1,x2,y2,rotation):
+        self.xpos,self.ypos=x1, gamesizey-y1
+        self.extent_x,self.extent_y = x2,y2
+        self.a = self.roationFunction(math.degrees(-rotation))
+
+    def roationFunction(self,rotationsize):
+        temp = [vector2d(),vector2d(),vector2d(),vector2d()]
+        temp[0].x,temp[0].y = self.xpos+self.extent_x*math.cos(math.radians(rotationsize))+self.extent_y*(-math.sin(math.radians(rotationsize))),\
+                        self.ypos+self.extent_x * math.sin(math.radians(rotationsize)) + self.extent_y * (math.cos(math.radians(rotationsize)))
+        temp[1].x, temp[1].y= self.xpos+self.extent_x*math.cos(math.radians(rotationsize))+(-self.extent_y)*(-math.sin(math.radians(rotationsize))),\
+                        self.ypos+self.extent_x * math.sin(math.radians(rotationsize)) + (-self.extent_y) * (math.cos(math.radians(rotationsize)))
+        temp[3].x, temp[3].y= self.xpos + -self.extent_x * math.cos(math.radians(rotationsize)) + self.extent_y * (
+        -math.sin(math.radians(rotationsize))), \
+                  self.ypos + -self.extent_x * math.sin(math.radians(rotationsize)) + self.extent_y * (
+                  math.cos(math.radians(rotationsize)))
+        temp[2].x, temp[2].y = self.xpos + -self.extent_x * math.cos(math.radians(rotationsize)) + (-self.extent_y) * (
+        -math.sin(math.radians(rotationsize))), \
+                  self.ypos + -self.extent_x * math.sin(math.radians(rotationsize)) + (-self.extent_y) * (
+                  math.cos(math.radians(rotationsize)))
+
+        return temp
+
+    def rotate(self,rotationsize):
+        self.a=self.roationFunction(rotationsize)
+
+    def collision(self,oobb):
+        temp = [vector2d(),vector2d(),vector2d(),vector2d()]
+
+
+
+
+    def print(self):
+        for num in range(4):
+            draw_line(int(self.a[num].x), int(self.a[num].y),int(self.a[(num+1)%4].x), int(self.a[(num+1)%4].y))
+            #draw_point(int(self.a[num].x),int(self.a[num].y))
+
+
+
+
+
+
 mydll = windll["KintctDLL"]
 initfuc = mydll["InitKinect"]
 Depthfunc = mydll["DepthImage"]
@@ -34,3 +96,4 @@ getContursfunc = mydll["getContoursCenter"]
 getContursfunc.argtypes = [POINTER(POINT),c_long,c_long]
 createimage = mydll["CreateImage"]
 createimage.restype = c_long
+createrectfunc = mydll["CreateRect"]

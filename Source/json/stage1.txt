@@ -1,0 +1,5 @@
+{
+     "minionnumber": 5,
+	"playernumber" : 4,
+	"scaletime" : 1
+}

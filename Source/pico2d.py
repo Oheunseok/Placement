@@ -209,6 +209,10 @@ def draw_point(x1: object, y1: object):
     SDL_SetRenderDrawColor(renderer, 100, 255, 0, 255)
     SDL_RenderDrawPoint(renderer, x1,-y1+canvas_height-1)
 
+def draw_line(x1,y1,x2,y2):
+    SDL_RenderDrawLine(renderer,x1,y1,x2,y2)
+
+
 class Image:
     """Pico2D Image Class"""
 

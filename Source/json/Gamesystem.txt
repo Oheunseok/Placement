@@ -1,0 +1,8 @@
+{
+     "gamesize": 1600,
+	"logoxpos" : 240,
+	"logoypos" : 100,
+"Depthfunc":125,
+"alpha" : 255,
+"gametime" : 30
+}

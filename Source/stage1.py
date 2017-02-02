@@ -28,18 +28,20 @@ stage1_file = open('json\stage1.txt','r')
 stage1_data = json.load(stage1_file)
 stage1_file.close()
 
-bitarray = None
 
 
 
 
 def enter():
-    global image,sample,m_time,bgm,frame_time,m_right,minion,colisionlist, bitarray,earth,star
-    global  m_down,m_up,m_right ,m_left,sun,saturn,playerlist,spaceship, inputlist,inputlen
-    global mouse_x, mouse_y
+    global image,sample,m_time,bgm,frame_time,m_right,minion,colisionlist, bitarray,earth,star,starttrigger
+    global  m_down,m_up,m_right ,m_left,sun,saturn,playerlist,spaceship, inputlist,inputlen,startimage
+    global mouse_x, mouse_y,current_time
+    startimage = imageclass.startimage()
+    current_time=0
     inputtype = m_mathclass.POINT * 255
     inputlen=0
     inputlist = inputtype()
+    starttrigger = False
 
     mouse_x,mouse_y = -50,-50
     frame_time=0
@@ -49,12 +51,12 @@ def enter():
     minion = []
     playerlist =[]
 
-    #if title.picturenumber==0:                  #0이면 이전 사진을 사용
-    #    title.picturenumber=1
+    print(title.picturenumber)
 
-    for picturenum in range(title.picturenumber):
+    for picturenum in range(1):
         sampleplayer = Player(picturenum)
-        sampleplayer.xpos, sampleplayer.ypos = (picturenum+1)*int(gamesizex / (title.picturenumber+1)), int(gamesizey / 2)
+        sampleplayer.xpos, sampleplayer.ypos = int((picturenum + 1) * (gamesizex / (title.picturenumber + 2))), int(gamesizey* 3/ 5)
+        #sampleplayer.xpos, sampleplayer.ypos = (picturenum + 1) * int(gamesizex / 2), int(gamesizey / 2)
         playerlist.append(sampleplayer)                          #플레이어 리스트
     for num in range(stage1_data["minionnumber"]):
         minion.append(imageclass.minion(num%2))                    ##미니언
@@ -70,29 +72,15 @@ def enter():
     sample = Sample()                               ##샘플 잇풋 클래스
     bgm = music.Space_music()
     m_time = timeclass.Time()
-    m_up, m_down, m_right, m_left = vector(),vector(),vector(),vector()
-    m_up.x,m_up.y = 0,-1
-    m_down.x,m_down.y=0,1
-    m_right.x,m_right.y=-1,0
-    m_left.x,m_left.y=1,0
-
-   # mydll = WinDLL('KintctDLL')
-   # initfuc = mydll["InitKinect"]
-
-   # initfuc()
-
-    b = (b'\xff\x00\xff\x00') * 100 * 100                       ## a , b,g,r 순서
 
 
-    #print(b)
-    bitarray = create_image_surface(b, 100, 100)
-
-    #m_mathclass.initfuc()
 
 
 
 def exit():
-    global image,player,sample,bgm,m_time,playerlist
+    global image,player,sample,bgm,m_time,playerlist,star,sun,earth,saturn,spaceship
+    del(star)
+    del(sun,earth,saturn,spaceship)
     del(m_time)
     del(bgm)
     del(image)
@@ -103,43 +91,93 @@ def exit():
 
 
 def update():
-    global mouse_x,mouse_y,colisionlist,inputlen,inputlist
+    global mouse_x,mouse_y,colisionlist,inputlen,inputlist,starttrigger,current_time
+
+    m_mathclass.Depthfunc(etc_data["Depthfunc"])
+    inputlen = m_mathclass.Contoursfunc()
+    m_mathclass.getContursfunc(inputlist, inputlen, 1)
 
     (mouse_x,mouse_y)=sample.inputreturn()
 
     frame_time=m_time.get_frame_time()
+    current_time+=frame_time
+    if not starttrigger:
+        for num in range(inputlen):
+                if startimage.collision(gamesizex-int(list(inputlist)[num].x*(gamesizex/512)), gamesizey-int(list(inputlist)[num].y*(gamesizey/424))):
+                    starttrigger = True
+        if current_time>5:
+            starttrigger = True
 
-    for player in playerlist:
-        player.update(frame_time)
-        player.playeroutcollide()
-        if player.movespeed > 500 and player.movebool:
-            player.rotatesize += frame_time * 10
 
-    for num in range(stage1_data["minionnumber"]):
-        for player in playerlist:                               ##모든 플레이어와 미니언 같의 충돌체크
-            if(colisionlist[num].colide_player(player)):
-                colisionlist[num].explosion_bool= True
-                colisionlist[num].explosion_bgm.play_music()
+    sinyposnum =0
+    if not starttrigger:
+        for player in playerlist:
+            player.ypos += math.sin(math.radians(current_time)*100)
+            sinyposnum+=1
 
-            if player.movebool==False:                          ## 플레이어가 멈추면 같이 멈추는 트리거들
+    if starttrigger:
+        for player in playerlist:
+            player.update(frame_time)
+            player.playeroutcollide()
+            if player.movespeed > 500 and player.movebool:
+                player.rotatesize += frame_time * 10
+
+            elif player.springbool == False:
+                for meltnum in range(pow(player.meltsize, 2)):  # 녹아내리는 트리거가 없어지면 실행
+                    player.meltV[meltnum] = 0
+                    player.meltS[meltnum] = 0
+            if player.movebool == False:  ## 플레이어가 멈추면 같이 멈추는 트리거들
                 player.scalebool = False
 
 
-        colisionlist[num].update(frame_time)
+        for num in range(stage1_data["minionnumber"]):
+            for player in playerlist:                               ##모든 플레이어와 미니언 같의 충돌체크
+                if(colisionlist[num].colide_player(player)):
+                    colisionlist[num].explosion_bool= True
+                    colisionlist[num].explosion_bgm.play_music()
+            colisionlist[num].update(frame_time)
 
-    earth.update(frame_time)
-    star.update(frame_time)
-    sun.update(frame_time)
-    saturn.update(frame_time)
-    spaceship.update(frame_time)
+        earth.update(frame_time)
+        star.update(frame_time)
+        sun.update(frame_time)
+        saturn.update(frame_time)
+        spaceship.update(frame_time)
 
 
 
 
-    m_mathclass.Depthfunc(75)
-    inputlen= m_mathclass.Contoursfunc()
-    m_mathclass.getContursfunc(inputlist,inputlen,0)
 
+
+        for player in playerlist:
+            for num in range(inputlen):
+                if (player.collision(gamesizex-int(list(inputlist)[num].x*(gamesizex/512)), gamesizey-int(list(inputlist)[num].y*(gamesizey/424)))
+                        and not player.movebool and not player.duplicatemovebool):
+                    randonnumber = random.randint(0, 100)
+                    if (randonnumber < 50):
+                        player.movebool = True
+                        player.scalebool = True
+                        player.image.set_color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+
+                        if (len(playerlist) < stage1_data["playernumber"]):
+                            playerlist.append(Player(player.num))  ##플레이어 추가 및, 분할
+                            playerlist[-1].xpos, playerlist[-1].ypos = player.xpos, player.ypos
+                            mouse_x, mouse_y = -50, -50
+                            playerlist[-1].w, playerlist[-1].h, playerlist[-1].bb_w, playerlist[-1].bb_h =\
+                                player.w, player.h, player.bb_w, player.bb_h
+                            playerlist[-1].movebool = True
+                            playerlist[-1].scalebool = True
+                            playerlist[-1].image.set_color(random.randint(0, 255), random.randint(0, 255),random.randint(0, 255))
+                            playerlist[-1].movevector.x, playerlist[-1].movevector.y = -player.movevector.x, -player.movevector.y
+
+                    elif randonnumber < 75:
+                        player.teleport()
+
+                    else:
+                        player.duplicatemovebool = True
+
+    if current_time>etc_data["gametime"]:
+        #title.stagenumber+=1
+        game_framework.change_state(title)
 
 
     #if(minion.colide_player(player)):
@@ -150,7 +188,7 @@ def update():
 
 
 def draw():
-    global image,player,sample,minion,colisionlist,inputlist,inputlen
+    global image,player,sample,minion,colisionlist,inputlist,inputlen,starttrigger
     global x, y
     global font, smallfont, bigfont
 
@@ -165,14 +203,18 @@ def draw():
     for player in playerlist:
         player.draw()
 
+    if not starttrigger:
+        startimage.draw()
+
     for num in range(stage1_data["minionnumber"]):
         colisionlist[num].draw()
     num =0
-    draw_rectangle( -20,-20,20,20)
+
     if inputlen>0:
         for num in range(inputlen):
-            draw_rectangle(int(list(inputlist)[num].x*2.5) - 10,gamesizey-int(list(inputlist)[num].y*2.2) - 10, int(list(inputlist)[num].x*2.5)+ 10, gamesizey-int(list(inputlist)[num].y*2.2) + 10)
-            print(list(inputlist)[num].x,list(inputlist)[num].y)
+            draw_rectangle(gamesizex-int(list(inputlist)[num].x*(gamesizex/512)) - 10,gamesizey-int(list(inputlist)[num].y*(gamesizey/424)) - 10,
+                           gamesizex-int(list(inputlist)[num].x*(gamesizex/512))+ 10, gamesizey-int(list(inputlist)[num].y*(gamesizey/424)) + 10)
+            #print(list(inputlist)[num].x,list(inputlist)[num].y)
 
     #minion.draw()
     ##bitarray.draw(400,300)
@@ -182,7 +224,7 @@ def draw():
 
 
 def handle_events():
-    global player,mouse_x,mouse_y
+    global player,mouse_x,mouse_y,starttrigger
     events = get_events()
 
     for event in events:
@@ -193,16 +235,22 @@ def handle_events():
             if (event.type, event.key) == (SDL_KEYDOWN, SDLK_ESCAPE):
                 game_framework.quit()
             if (event.type, event.key) == (SDL_KEYDOWN, SDLK_1):  ## red 플레이어 색깔변경
-                for player in playerlist:
-                    player.scalebool = not player.scalebool
+                if star:
+                    print(star)
             if (event.type, event.key) == (SDL_KEYDOWN, SDLK_2):  ## red 플레이어 색깔변경
                 for player in playerlist:
-                    player.image.set_color(0, 0, 0)
+                    player.image.set_color(255, 0, 0)
+            if (event.type, event.key) == (SDL_KEYDOWN, SDLK_6):  # 흘러내리는 효과 온오프 및 초기화
+                for player in playerlist:
+                    player.springbool = True
+                    #player.meltbool = not player.meltbool
+
         if (event.type, event.button) == (SDL_MOUSEBUTTONDOWN, SDL_BUTTON_LEFT):  ##마우스 피킹값반환
             (mouse_x, mouse_y) = sample.inputreturn()
             randonnumber = 0
+
             for player in playerlist:
-                if (player.collision(mouse_x, mouse_y) and not player.movebool and not player.duplicatemovebool):
+                if (player.collision(mouse_x, mouse_y) and not player.movebool and not player.duplicatemovebool and  starttrigger):
                     randonnumber =random.randint(0,100)
                     if (randonnumber<50):
                         player.movebool = True
@@ -216,7 +264,6 @@ def handle_events():
                             playerlist[-1].w,playerlist[-1].h,playerlist[-1].bb_w,playerlist[-1].bb_h=player.w,player.h, player.bb_w,player.bb_h
                             playerlist[-1].movebool = True
                             playerlist[-1].scalebool = True
-                            #playerlist[-1].image.set_color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                             playerlist[-1].movevector.x,playerlist[-1].movevector.y =-player.movevector.x,-player.movevector.y
 
                     elif randonnumber<75:
@@ -224,7 +271,9 @@ def handle_events():
 
                     else :
                         player.duplicatemovebool =True
-
+                if not starttrigger:
+                    if startimage.collision(mouse_x, mouse_y):
+                        starttrigger = True
 
 
 

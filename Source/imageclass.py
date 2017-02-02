@@ -6,7 +6,7 @@ import m_mathclass
 import music
 from ctypes import *
 
-debugmode = True
+debugmode = False
 etc_file = open('json\\Gamesystem.txt','r')
 etc_data = json.load(etc_file)
 etc_file.close()
@@ -31,6 +31,7 @@ class image:
         self.reversescale = False
         self.w,self.h = self.image.w,self.image.h
         self.bb_w,self.bb_h = self.image.w,self.image.h
+        self.First_bb_w, self.First_bb_h = self.image.w,self.image.h
         self.xpos,self.ypos = 400,300
         self.colorbool = False
 
@@ -66,11 +67,41 @@ class image:
         if bottom_a > top_b : return False
         return True
 
+    def collide_object(self, b):
+        left_a,bottom_a,right_a,top_a = self.get_bb()
+        left_b,bottom_b,right_b,top_b = b.get_bb()
+
+        right_temp_b = right_b
+        left_temp_b = right_b-2
+        bottom_temp_b = bottom_b
+        top_temp_b = top_b                              #사각형 오른쪽 판별
+        if not (left_a> right_temp_b) and not(right_a < left_temp_b) and not(top_a < bottom_temp_b) and not(bottom_a > top_temp_b) :
+                     self.movevector.x = 1
+        right_temp_b = left_b+2
+        left_temp_b = left_b
+
+        if not (left_a > right_temp_b) and not (right_a < left_temp_b) and not (top_a < bottom_temp_b) and not (
+            bottom_a > top_temp_b):
+            self.movevector.x = -1
+
+        right_temp_b = right_b
+        bottom_temp_b = top_b-2                     #사각형 위쪽
+        if not (left_a > right_temp_b) and not (right_a < left_temp_b) and not (top_a < bottom_temp_b) and not (
+                    bottom_a > top_temp_b):
+            self.movevector.y = 1
+
+        bottom_temp_b = bottom_b
+        top_temp_b = bottom_b+2
+
+        if not (left_a > right_temp_b) and not (right_a < left_temp_b) and not (top_a < bottom_temp_b) and not (
+                        bottom_a > top_temp_b):
+                self.movevector.y = -1
+
 
 
 class player(image):
     global player_data
-
+    playersize = player_data["playersize"]
     collapeV = player_data["collapeV"]
     collapeA = player_data["collapeA"]
     rotateV = player_data["rotateV"]
@@ -82,14 +113,17 @@ class player(image):
     melt_first_V = player_data["melt_first_V"]
     meltA = player_data["meltA"]
     duplicateA = player_data["dilicateA"]
+    fixedV = player_data["fixedV"]
+    fixedA = player_data["fixedA"]
 
     def __init__(self,num):
         self.num = num
         name = "picture%d"%num
         print(name)
         self.image = load_image(name+'.png')
+        self.shadowimage = load_image('s'+name+'.png')
         #self.image = load_image('alpha.png')
-        self.image.set_color(0, 0, 0)
+
         self.rotatesize=0
         self.rotatebool=False
         self.scalebool = False
@@ -98,14 +132,18 @@ class player(image):
         self. collapsebool = False
         self.movebool = False
         self.movevector = m_mathclass.vector()
+        self.movetime=0
         self.reversescale = False
         self.duplicatebool = True
         self.duplicatemovebool =False
+        self.springreverse = True
+        self.springbool = False
+        self.springnumber=0
         self.duplicatemovetime = 0
-        self.w,self.h = self.image.w/2,self.image.h/2                                       ##사진 크기
-        self.F_w,self.F_h = self.image.w/2,self.image.h/2
-        self.bb_w, self.bb_h = self.image.w/2, self.image.h/2                          ##충돌체크 크기
-        self.First_bb_w,self.First_bb_h = self.image.w/2, self.image.h/2
+        self.w,self.h = self.image.w*self.playersize,self.image.h*self.playersize                                       ##사진 크기
+        self.F_w,self.F_h = self.image.w*self.playersize,self.image.h*self.playersize
+        self.bb_w, self.bb_h = self.image.w*self.playersize, self.image.h*self.playersize                          ##충돌체크 크기
+        self.First_bb_w,self.First_bb_h = self.image.w*self.playersize, self.image.h*self.playersize
         self.xpos,self.ypos = -1000,-1000                     ##이미지 위치
         self.meltV = []
         self.meltS = []
@@ -118,13 +156,17 @@ class player(image):
         self.duplicate_time = 0
         self.teleportmusic = music.Teleport_music()
 
+        self.oobb = m_mathclass.oobb()
 
 
 
     def update(self, frame_time):
+
+        self.oobb.update(self.xpos,self.ypos,self.bb_w/2,self.bb_h/2,self.rotatesize)
+
         if self.duplicatebool:                                                  # 잔상효과
             self.duplicateupdate(frame_time)
-        if (self.w < self.F_w and self.h < self.F_h):
+        if (self.w < self.F_w*3/5 and self.h < self.F_h*3/5):
             self.reversescale = True
         elif (self.w > self.F_w and self.h > self.F_h):
             self.reversescale = False
@@ -144,12 +186,45 @@ class player(image):
         if(self.meltbool):
             self.melteupdate(frame_time)
         if(self.movebool):
-            self.xpos += self.movevector.x*frame_time*self.movespeed
-            self.ypos += self.movevector.y*frame_time*self.movespeed
-            self.movespeed-=self.moveA*frame_time
-            if(self.movespeed<0):
-                self.movebool=False
-                self.movespeed = 1000
+            self.move(frame_time)
+        if self.springbool:
+            self.springupdate(frame_time)
+
+        self.fixedplayerposition(frame_time)
+
+    def move(self,frametime):
+        self.rotatebool = True
+        self.movetime+=frametime
+        self.xpos += self.movevector.x * frametime * self.movespeed
+        self.ypos += self.movevector.y * frametime * self.movespeed
+        self.movespeed +=  self.moveA * math.sin(math.radians(self.movetime * 144))
+        print(math.sin(math.radians(self.movetime * 36)))
+        if (self.movetime>5):
+            self.rotatebool = False
+            self.movebool = False
+            self.movetime=0
+            self.movespeed = player_data["movespeed"]
+
+
+
+    def fixedplayerposition(self,frametime):              #플레이어를 내리거나 올리거나 중앙으로 약간 옮기게하기
+        if self.ypos>gamesizey*(2/5):               ## 플레이어가 너무 위에 있으면 아래로 내려오게한다
+            self.ypos-=frametime*self.fixedV
+            self.fixedV+=self.fixedA
+        if self.ypos<gamesizey*(1/6):
+            self.ypos+=frametime*self.fixedV
+            self.fixedV += self.fixedA
+        if self.xpos <gamesizex*(1/8):
+            self.xpos+=frametime*self.fixedV
+            self.fixedV += self.fixedA
+        if self.xpos > gamesizex*(7/8):
+            self.xpos -= frametime * self.fixedV
+            self.fixedV += self.fixedA
+
+        if not self.ypos>gamesizey*(2/5) and not self.ypos<gamesizey*(1/6)\
+                and not self.xpos <gamesizex*(1/8) and not self.xpos > gamesizex*(7/8):
+            self.fixedV = player_data["fixedV"]
+
 
     def duplicateupdate(self,frametime):
         self.duplicate_time += frametime
@@ -196,31 +271,62 @@ class player(image):
     def melteupdate(self,frame_time):
         for x in range(self.meltsize):
             for y in range(self.meltsize):
-                if (self.ypos - (int)(self.h / 2) + (int)(self.h / (self.meltsize * 2)) + (int)(
-                            self.h / self.meltsize) * y - self.meltS[self.meltsize * x + y]
-                        > self.ypos - (int)(self.h / 2)):
+                if (self.ypos - (int)(self.h / 2) + (int)(self.h / (self.meltsize * 2)) +
+                            (int)(self.h / self.meltsize) * y - self.meltS[self.meltsize * x + y]> self.ypos - (int)(self.h / 2)):
                     self.meltS[self.meltsize * x + y] += self.meltV[self.meltsize * x + y] * frame_time  # S=S+Vt
-                    self.meltV[self.meltsize * x + y] += self.meltA * frame_time  # V = V+At
+                    self.meltV[self.meltsize * x + y] += self.meltA * frame_time  # V = V+
 
-    def teleport(self):
+    def springupdate(self,frame_time):                                           #스프링
+        for x in range(self.meltsize):
+            for y in range(self.meltsize):
+                if self.springreverse:
+                    if (self.ypos - (int)(self.h / 2) + (int)(self.h / (self.meltsize * 2)) +
+                                (int)(self.h / self.meltsize) * y - self.meltS[self.meltsize * x + y]
+                            > self.ypos - (int)(self.h / 2)):
+                        self.meltS[self.meltsize * x + y] += self.meltV[self.meltsize * x + y] * frame_time  # S=S+Vt
+                        self.meltV[self.meltsize * x + y] += self.meltA * frame_time  # V = V+
+
+                    if self.meltS[-1] >= self.h - (int)(self.h / (self.meltsize * 2)):
+                            self.springreverse = False
+                else :
+                       if self.meltS[self.meltsize*x+y]>=0:
+                             self.meltS[self.meltsize * x + y] -= (20+30*y) * frame_time  # S=S+Vt
+                             self.meltV[self.meltsize * x + y] = 0  # V = V+
+                             if self.meltS[-1] < 0:
+                                 self.springnumber+=1
+                                 self.springreverse = True
+                             if self.springnumber>2:
+                                 self.springbool=False
+
+
+    def teleport(self):                                                                                     #텔레포트
         self.teleportmusic.play_music()
-        self.xpos = random.randint(0 + int(self.bb_w), gamesizex - int(self.bb_w))
-        self.ypos = random.randint(0 + int(self.bb_h), gamesizey - int(self.bb_h))
+        if gamesizex*(2/5)<self.bb_w or gamesizey*(2/5)<self.bb_h:
+            self.xpos = random.randint(0 + 100, gamesizex - 100)
+            self.ypos = random.randint(0 + 100, gamesizey - 100)
+        else:
+            self.xpos = random.randint(0 + int(self.bb_w), gamesizex - int(self.bb_w))
+            self.ypos = random.randint(0 + int(self.bb_h), gamesizey - int(self.bb_h))
 
 
 
     def draw(self):
-        if  (not self.collapsebool and not self.meltbool):
-            self.image.rotate_draw(self.rotatesize,self.xpos,self.ypos,self.w,self.h)                                 #기본 축소하면서 회전
-            if(self.duplicatebool):
+
+        if self.meltbool or self.springbool:
+            self.playermelt()                                                                           #녹아내리는 현상
+        elif (self.collapsebool):
+            self.playercliprotate()  # 분리 회전
+        else :
+            if (self.duplicatebool):
                 for num in range(player_data["duplicatesize"]):
-                    self.image.set_alpha(int(255/player_data["duplicatesize"]*num))
-                    self.image.rotate_draw(self.duplicaterotate[num], self.duplicatexpos[num], self.duplicateypos[num], self.w, self.h)  # 기본 축소하면서 회전
-                    self.image.set_alpha(255)
-        elif  (self.collapsebool and not self.meltbool):
-            self.playercliprotate()                                                                         #분리 회전
-        elif (self.meltbool):
-            self.playermelt()
+                    self.shadowimage.set_alpha(int(255 / player_data["duplicatesize"] * num))
+                    self.shadowimage.rotate_draw(self.duplicaterotate[num], self.duplicatexpos[num],
+                                                 self.duplicateypos[num], self.w, self.h)  # 기본 축소하면서 회전
+                    self.shadowimage.set_alpha(255)
+            self.image.rotate_draw(self.rotatesize,self.xpos,self.ypos,self.w,self.h)                                 #기본 축소하면서 회전
+
+
+
 
 
         if debugmode :
@@ -259,29 +365,25 @@ class player(image):
                                       self.ypos + (int)(self.F_h/ 4) + self.collapey,
                                       (int)(self.w / 2), (int)(self.h / 2))                                     ##오른쪽 위에
     def  playermelt(self):
-
         for x in range(self.meltsize):
             for y in range(self.meltsize):
-                self.image.clip_draw(0+(int)(self.w/self.meltsize)*x,0+(int)(self.h/self.meltsize)*y,         #이미지에서의 위치
+                self.shadowimage.clip_draw(0+(int)(self.w/self.meltsize)*x,0+(int)(self.h/self.meltsize)*y,         #이미지에서의 위치
                                        (int)(self.w/self.meltsize),(int)(self.h/self.meltsize),                 #조각난 크기
                                        self.xpos-(int)(self.w/2)+(int)(self.w/(self.meltsize*2))+(int)(self.w/self.meltsize)*x,      #화면에서의 x위치
                                        self.ypos-(int)(self.h/2)+(int)(self.h/(self.meltsize*2))+(int)(self.h/self.meltsize)*y-self.meltS[self.meltsize*x+y])      #화면에서의 y위치
 
 
-
-
-
     def playeroutcollide(self):                                                                     #맵바깥 충돌
-        if (self.ypos + int(self.bb_h) > gamesizey):
+        if (self.ypos + int(self.bb_h)/2 > gamesizey):
             self.movevector.y = -1
             self.movespeed -=player_data["Friction"]
-        elif (self.ypos - int(self.bb_h) < 0):
+        elif (self.ypos - int(self.bb_h)/2 < 0):
             self.movevector.y = 1
             self.movespeed -= player_data["Friction"]
-        elif (self.xpos + int(self.bb_w) > gamesizex):
+        elif (self.xpos + int(self.bb_w)/2 > gamesizex):
             self.movevector.x = -1
             self.movespeed -= player_data["Friction"]
-        elif (self.xpos - int(self.bb_w) < 0):
+        elif (self.xpos - int(self.bb_w)/2 < 0):
             self.movevector.x = 1
             self.movespeed -= player_data["Friction"]
 
@@ -296,7 +398,7 @@ class player(image):
             self.collapsebool = not self.collapsebool
             self.collapeV=player_data["collapeV"]
             self.collapsex, self.collapey=0,0
-        elif (event.type , event.key)==(SDL_KEYDOWN, SDLK_6):                                   #흘러내리는 효과 오오프 및 초기화
+        elif (event.type , event.key)==(SDL_KEYDOWN, SDLK_6):                                   #흘러내리는 효과 온오프 및 초기화
             self.meltbool = not self.meltbool
             for x in range(pow(self.meltsize,2)):
                 self.meltV[x]=0
@@ -309,35 +411,7 @@ class player(image):
         elif (event.type)==SDL_KEYDOWN:
             self.colorbool=False
 
-    def collide_object(self, b):
-        left_a,bottom_a,right_a,top_a = self.get_bb()
-        left_b,bottom_b,right_b,top_b = b.get_bb()
 
-        right_temp_b = right_b
-        left_temp_b = right_b-2
-        bottom_temp_b = bottom_b
-        top_temp_b = top_b                              #사각형 오른쪽 판별
-        if not (left_a> right_temp_b) and not(right_a < left_temp_b) and not(top_a < bottom_temp_b) and not(bottom_a > top_temp_b) :
-                     self.movevector.x = 1
-        right_temp_b = left_b+2
-        left_temp_b = left_b
-
-        if not (left_a > right_temp_b) and not (right_a < left_temp_b) and not (top_a < bottom_temp_b) and not (
-            bottom_a > top_temp_b):
-            self.movevector.x = -1
-
-        right_temp_b = right_b
-        bottom_temp_b = top_b-2                     #사각형 위쪽
-        if not (left_a > right_temp_b) and not (right_a < left_temp_b) and not (top_a < bottom_temp_b) and not (
-                    bottom_a > top_temp_b):
-            self.movevector.y = 1
-
-        bottom_temp_b = bottom_b
-        top_temp_b = bottom_b+2
-
-        if not (left_a > right_temp_b) and not (right_a < left_temp_b) and not (top_a < bottom_temp_b) and not (
-                        bottom_a > top_temp_b):
-                self.movevector.y = -1
 
 
 class minion(image):
@@ -411,16 +485,15 @@ class minion(image):
                                         self.ypos, self.w, self.h)
 
     def colide_player(self, player):
-        if(self.collide(player)):
+        if(self.collide(player) and not self.explosion_bool):
             player.collide_object(self)
             return True
 
 class earth(image):
-    image = None
 
     def __init__(self):
-        if (earth.image == None):
-            earth.image = load_image('png\\Earth.png')
+
+        self.image = load_image('png\\Earth.png')
         self.anim_xpos = [x * 400 for x in range(2)]
         self.anim_time = 0
         self.temp_time =0
@@ -439,11 +512,10 @@ class earth(image):
 
 
 class saturn(image):
-    image = None
 
     def __init__(self):
-        if (saturn.image == None):
-            saturn.image = load_image('png\\saturn.png')
+
+        self.image = load_image('png\\saturn.png')
         self.anim_xpos = [x * 400 for x in range(2)]
         self.anim_time = 0
         self.temp_time =0
@@ -462,10 +534,10 @@ class saturn(image):
 
 
 class sun(image):
-    image = None
+
     def __init__(self):
-        if (sun.image == None):
-            sun.image = load_image('png\\Sun.png')
+
+        self.image = load_image('png\\Sun.png')
         self.anim_xpos = [x * 400 for x in range(2)]
         self.anim_time = 0
         self.temp_time =0
@@ -483,10 +555,9 @@ class sun(image):
         self.image.clip_draw(0+self.anim_xpos[int(self.anim_time)%2],0,400,400,gamesizex*690/800,gamesizey*490/600,gamesizey*250/600,gamesizey*250/600)
 
 class star():
-    image = None
+
     def __init__(self):
-        if (star.image == None):
-            star.image = load_image('png\\SpaceStar.png')
+        self.image = load_image('png\\SpaceStar.png')
         self.rotate_time =0
 
     def update(self, frametime):
@@ -497,11 +568,10 @@ class star():
 
 
 class spaceship():
-    image = None
 
     def __init__(self):
-        if (spaceship.image == None):
-            spaceship.image = load_image('png\\Spaceship.png')
+
+        self.image = load_image('png\\Spaceship.png')
         self.rocket_music = music.Rocket_music()
         self.rotate_time = 0
         self.anim_xpos = [x * 400 for x in range(6)]
@@ -520,3 +590,37 @@ class spaceship():
     def draw(self):
         self.image.clip_rotate_draw(math.radians(-40),0 + self.anim_xpos[int(self.anim_time) % 6], 0, 400, 400, gamesizex*400/800+self.xpos, gamesizey*-100/600+self.ypos, gamesizey*180/600, gamesizey*180/600)
 
+class startimage(image):
+
+    def __init__(self):
+
+        self.image = load_image('png\\startbutton.png')
+        self.w, self.h = self.image.w, self.image.h
+        self.xpos,self.ypos = gamesizex * 400 / 800, gamesizey * 300 / 600
+        self.bb_w, self.bb_h = gamesizex * 100 / 800, gamesizey * 100 / 600
+        self.First_bb_w, self.First_bb_h = self.image.w, self.image.h
+
+    def draw(self):
+        self.image.clip_draw(0 , 0, 300, 300,                                   # 이미지 시작위치와 끝위치
+                             gamesizex * 400 / 800, gamesizey * 450 / 600,      #화면 위치
+                             self.bb_w, self.bb_h)      #이미지크기
+
+class finger(image):
+
+    def __init__(self):
+        self.image = load_image('png\\Finger.png')
+        self.anim_xpos = [x * 400 for x in range(2)]
+        self.anim_time = 0
+        self.temp_time =0
+
+    def update(self, frametime):
+        if(self.anim_time<4):
+            self.anim_time += frametime * 5
+        elif(self.temp_time<2):
+            self.temp_time+=frametime
+        else:
+            self.temp_time=0
+            self.anim_time=0
+
+    def draw(self):
+        self.image.clip_draw(0+self.anim_xpos[int(self.anim_time)%2],0,400,400,gamesizex*300/800,gamesizey*430/600,gamesizey*150/600,gamesizey*150/600)

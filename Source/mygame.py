@@ -10,11 +10,13 @@ import game_framework
 
 import stage1
 import title
+import start
+import shadowtimer
 
 
 
 
 
-game_framework.run(title)
+game_framework.run(start)
 
 
