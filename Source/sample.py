@@ -1,54 +1,31 @@
-import platform
-import os
-from ctypes import *
+
 import random
-import time
+import math
+
+class player:
+    def __init__(self,x,y):
+        self.xpos = x
+        self.ypos = y
+class playersort:
+    def __init__(self,size,num):
+        self.size=size
+        self.num=num
+    def sizeR(self):
+        return self.size
 
 
 
-class POINT(Structure):
-    _fields_ = [("x",c_long),("y",c_long)]
+playerlist = [player(random.randint(-100,100),random.randint(-100,100)) for x in range(10)]
 
 
+list = []
 
-#Depthfunc(95)
-#len = Contoursfunc()
-#print("hi")
-#del arrayType
-#print("hihi")
-#del(array)
-#print("hihihi")
-#arrayType = POINT * len
-#print(arrayType)
-
-#array1 = arrayType()
-#time.sleep(4)
-#getContursfunc(array, len)
-#del array
-
-
-
-fakedll = windll["FakeKinectDLL"]
-counfunc = fakedll["ContoursCenterLen"]
-counfunc.restype = c_long
-len = counfunc()
-
-getCountoursCenterfun = fakedll["getContoursCenter"]
-getCountoursCenterfun.argtypes = [POINTER(POINT),c_long]
-
-
-##되는거
-for j in range(25):
-    len = random.randint(100, 254)
-    arrType = POINT * len
-
-
-    arr = arrType()
-    getCountoursCenterfun(arr,len)
-
-    for i in range(len):
-        print(list(arr)[i].x,list(arr)[i].y)
-    print(j)
-    print("count")
-
-    del arr
+k = player(30,30)
+num =0
+for play in playerlist:
+    list.append(playersort(math.fabs(k.xpos - play.xpos) + math.fabs(k.ypos-play.ypos),num))
+    num +=1
+list.sort(key=playersort.sizeR)
+print(len(list))
+for x in range(10):
+    print(list[x].size )

@@ -33,14 +33,18 @@ stage1_file.close()
 
 
 def enter():
-    global image,sample,m_time,bgm,frame_time,m_right,minion,colisionlist, bitarray,earth,star,starttrigger
-    global  m_down,m_up,m_right ,m_left,sun,saturn,playerlist,spaceship, inputlist,inputlen,startimage
+    global image,sample,m_time,bgm,frame_time,m_right,minion,colisionlist, bitarray,earth,star,starttrigger,contourRectCenter,contourR
+    global  sun,saturn,playerlist,spaceship, inputlist,inputlen,meteolist,inputAABB,fingerlist
     global mouse_x, mouse_y,current_time
-    startimage = imageclass.startimage()
+    #startimage = imageclass.startimage()
     current_time=0
-    inputtype = m_mathclass.POINT * 255
+
+    contourRectType = m_mathclass.POINT * 500           #컨투어 자료형
+
+
     inputlen=0
-    inputlist = inputtype()
+    contourRectCenter = contourRectType()           #컨투어 센터 리스트
+    contourR = contourRectType()                    #컨투어 바운딩 박스 크기 리스트
     starttrigger = False
 
     mouse_x,mouse_y = -50,-50
@@ -50,10 +54,12 @@ def enter():
 
     minion = []
     playerlist =[]
+    inputAABB = []
 
-    print(title.picturenumber)
-
-    for picturenum in range(1):
+    #print(title.picturenumber)
+    if title.picturenumber == 0:                                             #아무도 안찍혔을때 전의 사진을 띄움
+        title.picturenumber = 1
+    for picturenum in range(title.picturenumber):                       #타이틀에서 찍힌 사람 수 만큼 플레이어 리스트 생성
         sampleplayer = Player(picturenum)
         sampleplayer.xpos, sampleplayer.ypos = int((picturenum + 1) * (gamesizex / (title.picturenumber + 2))), int(gamesizey* 3/ 5)
         #sampleplayer.xpos, sampleplayer.ypos = (picturenum + 1) * int(gamesizex / 2), int(gamesizey / 2)
@@ -68,66 +74,67 @@ def enter():
     saturn = imageclass.saturn()
     spaceship = imageclass.spaceship()
 
+    fingerlist = [imageclass.finger() for num in range(1)]
+    for num in range(title.picturenumber):              #플레이어 이미지 위에 손바닥 이미지 생성
+        fingerlist[num].xpos,fingerlist[num].ypos = int((num + 1) * (gamesizex / (title.picturenumber + 2))), int(gamesizey* 3/ 5)
+
+
     colisionlist = [minion[num] for num in range(stage1_data["minionnumber"])]
     sample = Sample()                               ##샘플 잇풋 클래스
     bgm = music.Space_music()
     m_time = timeclass.Time()
+    meteolist = [imageclass.meteor(x) for x in range(6)]
 
 
 
 
 
 def exit():
-    global image,player,sample,bgm,m_time,playerlist,star,sun,earth,saturn,spaceship
-    del(star)
-    del(sun,earth,saturn,spaceship)
-    del(m_time)
-    del(bgm)
-    del(image)
-    del(player)
-    del(playerlist)
-    del(sample)
-    close_canvas()
+    global image, sample, m_time, bgm, frame_time,  minion, colisionlist,  earth, star, starttrigger, contourRectCenter, contourR
+    global  sun, saturn, playerlist, spaceship,  inputlen,  meteolist, inputAABB, fingerlist
+    global mouse_x, mouse_y, current_time
+    del(image, sample, m_time, bgm, frame_time, minion, colisionlist, earth, star, starttrigger, contourRectCenter, contourR)
+    del(sun, saturn, playerlist, spaceship, inputlen,  meteolist, inputAABB, fingerlist)
+
 
 
 def update():
-    global mouse_x,mouse_y,colisionlist,inputlen,inputlist,starttrigger,current_time
+    global mouse_x,mouse_y,colisionlist,inputlen,starttrigger,current_time,meteolist,contourRectCenter,contourR,inputAABB,fingerlist
 
-    m_mathclass.Depthfunc(etc_data["Depthfunc"])
-    inputlen = m_mathclass.Contoursfunc()
-    m_mathclass.getContursfunc(inputlist, inputlen, 1)
-
-    (mouse_x,mouse_y)=sample.inputreturn()
+    del(inputAABB)
+    inputAABB = []
+    m_mathclass.Depthfunc()
+    #inputlen = m_mathclass.Contoursfunc()
+    ############################################ contours
+    if __name__ == '__main__':
+        m_mathclass.getContourRect(contourRectCenter, contourR)         #컨투어 센터와 크기를 리스트 안에 넣어준다
+    inputlen = m_mathclass.getContourRectCountfunc()                    #컨투어 센터들의 길이 반환
+    (mouse_x,mouse_y)=sample.inputreturn()                              #마우스 피킹 값
+    for aabb in range(inputlen):                            #바운딩 박스 생성, 컨투어 센터를 기반으로
+        inputAABB.append(imageclass.AABB(gamesizex-int(list(contourRectCenter)[aabb].x*(gamesizex/512)),gamesizey-int(list(contourRectCenter)[aabb].y*(gamesizey/424)),
+                                                       int(list(contourR)[aabb].y*(gamesizey/424)*2),int(list(contourR)[aabb].x*(gamesizex/512))*2))
 
     frame_time=m_time.get_frame_time()
     current_time+=frame_time
     if not starttrigger:
-        for num in range(inputlen):
-                if startimage.collision(gamesizex-int(list(inputlist)[num].x*(gamesizex/512)), gamesizey-int(list(inputlist)[num].y*(gamesizey/424))):
-                    starttrigger = True
         if current_time>5:
             starttrigger = True
 
 
     sinyposnum =0
     if not starttrigger:
-        for player in playerlist:
+        for player in playerlist:                       #풍선처럼 둥둥 떠다니게핟기
             player.ypos += math.sin(math.radians(current_time)*100)
             sinyposnum+=1
+        for finger in fingerlist:
+            finger.update(frame_time)
 
-    if starttrigger:
+
+
+    if starttrigger:                    #시작 트리거
         for player in playerlist:
             player.update(frame_time)
-            player.playeroutcollide()
-            if player.movespeed > 500 and player.movebool:
-                player.rotatesize += frame_time * 10
-
-            elif player.springbool == False:
-                for meltnum in range(pow(player.meltsize, 2)):  # 녹아내리는 트리거가 없어지면 실행
-                    player.meltV[meltnum] = 0
-                    player.meltS[meltnum] = 0
-            if player.movebool == False:  ## 플레이어가 멈추면 같이 멈추는 트리거들
-                player.scalebool = False
+            player.playeroutcollide()       #플레이어의 외부벽과의 충돌
 
 
         for num in range(stage1_data["minionnumber"]):
@@ -142,41 +149,12 @@ def update():
         sun.update(frame_time)
         saturn.update(frame_time)
         spaceship.update(frame_time)
+        for meteo in meteolist:
+            meteo.update(frame_time)
 
-
-
-
-
-
-        for player in playerlist:
-            for num in range(inputlen):
-                if (player.collision(gamesizex-int(list(inputlist)[num].x*(gamesizex/512)), gamesizey-int(list(inputlist)[num].y*(gamesizey/424)))
-                        and not player.movebool and not player.duplicatemovebool):
-                    randonnumber = random.randint(0, 100)
-                    if (randonnumber < 50):
-                        player.movebool = True
-                        player.scalebool = True
-                        player.image.set_color(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-
-                        if (len(playerlist) < stage1_data["playernumber"]):
-                            playerlist.append(Player(player.num))  ##플레이어 추가 및, 분할
-                            playerlist[-1].xpos, playerlist[-1].ypos = player.xpos, player.ypos
-                            mouse_x, mouse_y = -50, -50
-                            playerlist[-1].w, playerlist[-1].h, playerlist[-1].bb_w, playerlist[-1].bb_h =\
-                                player.w, player.h, player.bb_w, player.bb_h
-                            playerlist[-1].movebool = True
-                            playerlist[-1].scalebool = True
-                            playerlist[-1].image.set_color(random.randint(0, 255), random.randint(0, 255),random.randint(0, 255))
-                            playerlist[-1].movevector.x, playerlist[-1].movevector.y = -player.movevector.x, -player.movevector.y
-
-                    elif randonnumber < 75:
-                        player.teleport()
-
-                    else:
-                        player.duplicatemovebool = True
 
     if current_time>etc_data["gametime"]:
-        #title.stagenumber+=1
+        title.stagenumber+=1
         game_framework.change_state(title)
 
 
@@ -188,9 +166,9 @@ def update():
 
 
 def draw():
-    global image,player,sample,minion,colisionlist,inputlist,inputlen,starttrigger
+    global image,player,sample,minion,colisionlist,inputlist,inputlen,starttrigger,contourRectCenter,contourR
     global x, y
-    global font, smallfont, bigfont
+    global font, smallfont, bigfont,fingerlist
 
     clear_canvas()
 
@@ -200,26 +178,25 @@ def draw():
     sun.draw()
     saturn.draw()
     spaceship.draw()
+    for meteo in meteolist:
+        meteo.draw()
+
     for player in playerlist:
         player.draw()
 
     if not starttrigger:
-        startimage.draw()
+        for finger in fingerlist:
+            finger.draw()
 
     for num in range(stage1_data["minionnumber"]):
         colisionlist[num].draw()
     num =0
+    if inputlen > 0:
+       for num in range(inputlen):                                                   #인풋값을 확인
+           draw_rectangle(gamesizex-int(list(contourRectCenter)[num].x*(gamesizex/512)) - int(list(contourR)[num].x*(gamesizex/512)),
+                          gamesizey-int(list(contourRectCenter)[num].y*(gamesizey/424)) - int(list(contourR)[num].y*(gamesizey/424)),
+                          gamesizex-int(list(contourRectCenter)[num].x*(gamesizex/512))+ int(list(contourR)[num].x*(gamesizex/512)), gamesizey-int(list(contourRectCenter)[num].y*(gamesizey/424)) + int(list(contourR)[num].y*(gamesizey/424)))
 
-    if inputlen>0:
-        for num in range(inputlen):
-            draw_rectangle(gamesizex-int(list(inputlist)[num].x*(gamesizex/512)) - 10,gamesizey-int(list(inputlist)[num].y*(gamesizey/424)) - 10,
-                           gamesizex-int(list(inputlist)[num].x*(gamesizex/512))+ 10, gamesizey-int(list(inputlist)[num].y*(gamesizey/424)) + 10)
-            #print(list(inputlist)[num].x,list(inputlist)[num].y)
-
-    #minion.draw()
-    ##bitarray.draw(400,300)
-    draw_rectangle(mouse_x-10,mouse_y-10,mouse_x+10,mouse_y+10)
-    draw_point(mouse_x,mouse_y)
     update_canvas()
 
 
@@ -249,31 +226,19 @@ def handle_events():
             (mouse_x, mouse_y) = sample.inputreturn()
             randonnumber = 0
 
-            for player in playerlist:
-                if (player.collision(mouse_x, mouse_y) and not player.movebool and not player.duplicatemovebool and  starttrigger):
+            for player in playerlist:                                                    #플레이어 마우스 피킹 충돌체크
+                if (player.collision(mouse_x, mouse_y) ):
+                    player.AItrigger = True
                     randonnumber =random.randint(0,100)
                     if (randonnumber<50):
-                        player.movebool = True
-                        player.scalebool = True
-                        #player.image.set_color(random.randint(0,255),random.randint(0,255),random.randint(0,255))
-
                         if (len(playerlist)<stage1_data["playernumber"]):
                             playerlist.append(Player(player.num))         ##플레이어 추가 및, 분할
                             playerlist[-1].xpos, playerlist[-1].ypos = player.xpos, player.ypos
                             mouse_x,mouse_y = -50,-50
                             playerlist[-1].w,playerlist[-1].h,playerlist[-1].bb_w,playerlist[-1].bb_h=player.w,player.h, player.bb_w,player.bb_h
-                            playerlist[-1].movebool = True
-                            playerlist[-1].scalebool = True
                             playerlist[-1].movevector.x,playerlist[-1].movevector.y =-player.movevector.x,-player.movevector.y
+                            playerlist[-1].AItrigger = True
 
-                    elif randonnumber<75:
-                        player.teleport()
-
-                    else :
-                        player.duplicatemovebool =True
-                if not starttrigger:
-                    if startimage.collision(mouse_x, mouse_y):
-                        starttrigger = True
 
 
 

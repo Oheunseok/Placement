@@ -11,6 +11,12 @@
 #define TESTKINECT_API __declspec(dllimport)
 #endif
 
+#define BGCOUNT 50
+
+#define CONTOURSIZE 50
+#define CONTOURLEN 50
+#define CONTOURRECT 500
+
 template<class Interface>
 inline void SafeRelease(Interface *& pInterfaceToRelease)
 {
@@ -20,6 +26,8 @@ inline void SafeRelease(Interface *& pInterfaceToRelease)
 		pInterfaceToRelease = NULL;
 	}
 }
+
+
 
 namespace TestKinect
 {
@@ -43,10 +51,9 @@ namespace TestKinect
 		float m_b;
 		cv::Mat shadowImage;
 
-		cv::Mat true_touchPoint;  // true  Touch //Only mockup
-		cv::Mat false_touchPoint; // false Touch //Only mockup
+		cv::Mat AddMat[BGCOUNT];
 
-		std::vector< std::vector< cv::Point> > contours;
+		//std::vector< std::vector< cv::Point> > contours;
 
 		std::vector< std::vector< cv::Point> > true_touchcontours;  //Only mockup
 		std::vector< std::vector< cv::Point> > false_touchcontours; //Only mockup
@@ -57,8 +64,14 @@ namespace TestKinect
 		cv::Mat mDepthBufferMat;
 		cv::Mat mCoordinateMat;
 		cv::Mat mColorCopyMat;
+		cv::Mat mWhiteMat;
+
+		cv::Mat bgMat;
+
+		cv::Mat diffMat;
 
 		RGBQUAD* m_pColorFrameRGBX;
+		RGBQUAD* m_pWhiteFrameRGBX;
 
 		RGBQUAD*                m_pOutputRGBX;
 		RGBQUAD*                m_pBackgroundRGBX;
@@ -78,7 +91,10 @@ namespace TestKinect
 		int contours_size;
 		int shadowImage_width, shadowImage_height;
 
+		
+
 	public:
+		std::vector< std::vector< cv::Point> > contours;
 
 		mKinect();
 		~mKinect();
@@ -138,9 +154,33 @@ namespace TestKinect
 		void createContours(int threshold);/// dpeth mat의 contour list 만들기.
 		long getContoursCenterLen();		// contours center의 길이를 리턴해준다.
 		void getContoursCenter();			// contours center를 넘겨준다.
-		POINT mContoursCenter[255];
+		POINT mContoursCenter[500];
+
+		POINT mContours[CONTOURSIZE][CONTOURLEN];
+
+		POINT mContourRect[CONTOURRECT];
+
+		long rectCount;
 
 		void AddBackGround();
+		void CreateBG();
+		void DiffMat();
+		void createContoursDiffMat();
+		
+		long CheckBG(const char*filename);
+
+		void contoursRect(POINT*center,POINT*r);
+
+		void KinectgetContours(POINT*list, long len);
+		long getContoursLen();
+
+		long contoursCount = 0;
+
+		void closeWindow(){
+			cv::destroyAllWindows();
+		}
+
+
 		/*bool CreateShadowImage(int MaxImageCount);
 		POINT** getImageContours(int num);
 		POINT* getImageContoursCenter(int num);

@@ -21,6 +21,28 @@ EXTERNC TESTKINECT_API long ContoursCenterLen();
 EXTERNC TESTKINECT_API void DepthImage(int threshold);
 EXTERNC TESTKINECT_API void CreateRect();
 
+EXTERNC TESTKINECT_API void BGCreate();
+EXTERNC TESTKINECT_API void DepthImageUpdate();
+EXTERNC TESTKINECT_API long getContoursLen();	//contours 넘기는거 하자.
+EXTERNC TESTKINECT_API void getContours(POINT*list, long len, long render);
+EXTERNC TESTKINECT_API void closeCVwindow();
+EXTERNC TESTKINECT_API void getContoursRect(POINT*center, POINT*r);
+
+EXTERNC TESTKINECT_API long getContourRectCount();
+
+EXTERNC TESTKINECT_API int unityReturnint();
+EXTERNC TESTKINECT_API int* unityReturnintPointer();
+
+EXTERNC TESTKINECT_API void unityGetPOINT(POINT* list);
+EXTERNC TESTKINECT_API POINT* unityReturnPOINT();
+
+EXTERNC TESTKINECT_API int init();
+
+EXTERNC TESTKINECT_API int closeKinect();
+EXTERNC TESTKINECT_API POINT getRectWidth();
+EXTERNC TESTKINECT_API void UnityRect(POINT*center, POINT*r);
+EXTERNC TESTKINECT_API int getRectCount();
+EXTERNC TESTKINECT_API long CheckBG();
 
 //EXTERNC TESTKINECT_API long Foopoint(POINT* batch, long bufferSize)
 //{

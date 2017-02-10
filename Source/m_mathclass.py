@@ -11,7 +11,7 @@ gamesizey=(int)(etc_data["gamesize"]/4*3)                                       
 
 class vector:
     def __init__(self):
-        self.x,self.y= 1,1
+        self.x,self.y= 1.0,1.0
         self.v =30
         self. vector2_input = 1
         self. collect = 5
@@ -33,6 +33,17 @@ class POINT(Structure):
 class vector2d:
     def __init__(self):
         self.x,self.y = 0,0
+
+    def dot(self,v2):
+        return self.x*v2.x+self.y*v2.y
+    def __sub__(self, other):
+        return self.x-other.x,self.y-other.y
+
+    def normalize(self):
+        leng = math.fabs(math.sqrt(self.x*self.x + self.y*self.y))
+        self.x = self.x/leng
+        self.y = self.y/leng
+
 
 class oobb:
     def __init__(self):
@@ -71,25 +82,33 @@ class oobb:
     def rotate(self,rotationsize):
         self.a=self.roationFunction(rotationsize)
 
-    def collision(self,oobb):
+    def collision(self,obb):
         temp = [vector2d(),vector2d(),vector2d(),vector2d()]
-
-
-
+        R = vector2d()
+        R.x,R.y = self.xpos-obb.xpos,self.ypos-obb.ypos
+        temp[0].x,temp.y = self.a[0]-self.a[1]
+        temp[0].dot(R)
+        temp[0].normalize()
+        print(temp[0].x,temp[0].y)
 
     def print(self):
         for num in range(4):
             draw_line(int(self.a[num].x), int(self.a[num].y),int(self.a[(num+1)%4].x), int(self.a[(num+1)%4].y))
             #draw_point(int(self.a[num].x),int(self.a[num].y))
 
+class playersort:
+    def __init__(self,size,num):
+        self.size=size
+        self.num=num
+    def sizeR(self):
+        return self.size
 
 
 
 
-
-mydll = windll["KintctDLL"]
+mydll = windll["KinectDll"]
 initfuc = mydll["InitKinect"]
-Depthfunc = mydll["DepthImage"]
+Depthfunc = mydll["DepthImageUpdate"]
 Contoursfunc = mydll["ContoursCenterLen"]
 Contoursfunc.restype = c_long
 getContursfunc = mydll["getContoursCenter"]
@@ -97,3 +116,16 @@ getContursfunc.argtypes = [POINTER(POINT),c_long,c_long]
 createimage = mydll["CreateImage"]
 createimage.restype = c_long
 createrectfunc = mydll["CreateRect"]
+
+BGCreatefunc = mydll["BGCreate"]
+getContoursLen = mydll["getContoursLen"]
+getContoursLen.restype = c_long
+getContours = mydll["getContours"]
+getContours.argtype = [POINTER(POINT),c_long,c_long]
+closeCVwindow = mydll["closeCVwindow"]
+
+getContourRect = mydll["getContoursRect"]
+getContourRect.argtype = [POINTER(POINT),POINTER(POINT)]
+
+getContourRectCountfunc = mydll["getContourRectCount"]
+getContourRectCountfunc.restype = c_long

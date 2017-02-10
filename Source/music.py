@@ -5,10 +5,25 @@ import random
 
 
 class Space_music():
-    bgm=None
+
     def __init__(self):
-        if self.bgm==None:
+
             self.bgm=load_music('ogg\\SPACE.ogg')
+            self.bgm.set_volume(98)
+            self.bgm.repeat_play()
+class Cartoon_music():
+
+    def __init__(self):
+
+            self.bgm=load_music('ogg\\pixelland.ogg')
+            self.bgm.set_volume(98)
+            self.bgm.repeat_play()
+
+class stage3_music():
+
+    def __init__(self):
+
+            self.bgm = load_music('ogg\\Professor Umlaut.ogg')
             self.bgm.set_volume(98)
             self.bgm.repeat_play()
 
@@ -17,7 +32,7 @@ class Camera_music():
     def __init__(self):
         if self.bgm == None:
             self.bgm = load_music('ogg\\MOVE_STOP.ogg')
-            self.bgm.set_volume(24)
+            self.bgm.set_volume(98)
             self.bgm.play()
 
 class Explosion_music():
@@ -60,3 +75,23 @@ class Spring_music():
 
     def play_music(self):
         Spring_music.bgm.play()
+
+class Bear_music():
+    bgm = None
+    def __init__(self):
+        if Bear_music.bgm == None:
+            Bear_music.bgm = load_wav('ogg\\bear.ogg')
+            Bear_music.bgm.set_volume(180)
+        #self.bgm.repeat_play()
+    def play_music(self):
+        Bear_music.bgm.play()
+
+class Rabbit_music():
+    bgm = None
+    def __init__(self):
+        if Rabbit_music.bgm == None:
+            Rabbit_music.bgm = load_wav('ogg\\rabbit.ogg')
+            Rabbit_music.bgm.set_volume(180)
+        #self.bgm.repeat_play()
+    def play_music(self):
+        Rabbit_music.bgm.play()

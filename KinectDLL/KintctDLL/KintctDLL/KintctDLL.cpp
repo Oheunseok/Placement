@@ -47,10 +47,14 @@ namespace TestKinect{
 		mDepthMat = cv::Mat(cDepthHeight, cDepthWidth, CV_8UC1);
 		mCoordinateMat = cv::Mat(cDepthHeight,cDepthWidth,CV_8UC4);
 
+		mWhiteMat = cv::Mat(cColorHeight, cColorWidth, CV_8UC4);
+
 		// create heap storage for composite image pixel data in RGBX format
 		m_pOutputRGBX = new RGBQUAD[cColorWidth * cColorHeight];
 
 		m_pColorFrameRGBX = new RGBQUAD[cColorWidth*cColorHeight];
+
+		m_pWhiteFrameRGBX = new RGBQUAD[cColorWidth*cColorHeight];
 
 		// create heap storage for background image pixel data in RGBX format
 		m_pBackgroundRGBX = new RGBQUAD[cColorWidth * cColorHeight];
@@ -63,6 +67,14 @@ namespace TestKinect{
 
 		depthBuffer = new UINT16[cDepthHeight * cDepthWidth];
 		
+		for (int i = 0; i < BGCOUNT; ++i){
+			AddMat[i] = cv::Mat(cDepthHeight, cDepthWidth, CV_8UC1);
+		}
+
+		bgMat = cv::Mat(cDepthHeight, cDepthWidth, CV_8UC1);
+
+		diffMat = cv::Mat(cDepthHeight, cDepthWidth, CV_8UC1);
+
 		cv::namedWindow("Depth");
 		cv::setMouseCallback("Depth", CallBackFunc, NULL);
 	}
@@ -80,6 +92,12 @@ namespace TestKinect{
 		{
 			delete[] m_pColorFrameRGBX;
 			m_pColorFrameRGBX = NULL;
+		}
+
+		if (m_pWhiteFrameRGBX)
+		{
+			delete[] m_pWhiteFrameRGBX;
+			m_pWhiteFrameRGBX = NULL;
 		}
 
 		if (m_pBackgroundRGBX)
@@ -121,7 +139,55 @@ namespace TestKinect{
 	}
 
 	void mKinect::Finalize(){
+		if (m_pOutputRGBX)
+		{
+			delete[] m_pOutputRGBX;
+			m_pOutputRGBX = NULL;
+		}
 
+		if (m_pColorFrameRGBX)
+		{
+			delete[] m_pColorFrameRGBX;
+			m_pColorFrameRGBX = NULL;
+		}
+
+		if (m_pWhiteFrameRGBX)
+		{
+			delete[] m_pWhiteFrameRGBX;
+			m_pWhiteFrameRGBX = NULL;
+		}
+
+		if (m_pBackgroundRGBX)
+		{
+			delete[] m_pBackgroundRGBX;
+			m_pBackgroundRGBX = NULL;
+		}
+
+		if (m_pColorRGBX)
+		{
+			delete[] m_pColorRGBX;
+			m_pColorRGBX = NULL;
+		}
+
+		if (m_pDepthCoordinates)
+		{
+			delete[] m_pDepthCoordinates;
+			m_pDepthCoordinates = NULL;
+		}
+
+		// done with frame reader
+		SafeRelease(m_pMultiSourceFrameReader);
+
+		// done with coordinate mapper
+		SafeRelease(m_pCoordinateMapper);
+
+		// close the Kinect Sensor
+		if (m_pKinectSensor)
+		{
+			m_pKinectSensor->Close();
+		}
+
+		SafeRelease(m_pKinectSensor);
 	}
 
 	void mKinect::get(int& a, float& b){
@@ -264,39 +330,12 @@ namespace TestKinect{
 	}
 
 	int mKinect::touchmockupLoadimage(const char* name, bool touch){
-		if (touch){
-			true_touchPoint = cv::imread(name);
-		}
-		else{
-			false_touchPoint = cv::imread(name);
-		}
+		
 		return 1;
 	}
 
 	void mKinect::updateTouchContour(){
-		cv::Mat grayMat(true_touchPoint.rows, true_touchPoint.cols, CV_8UC3);
-		std::cout << "grayMat create" << std::endl;
-		cv::Mat cannyMat(true_touchPoint.rows, true_touchPoint.cols, CV_8UC3);
-		std::cout << "cannyMat create" << std::endl;
-		cv::cvtColor(true_touchPoint, grayMat, CV_RGB2GRAY);
-		std::cout << "gray convert" << std::endl;
-		cv::Canny(grayMat, cannyMat, 30, 128, 3, false); // contour 찾기위한 cannyedge 작업
-		std::cout << "canny convert" << std::endl;
-		cv::findContours(cannyMat, true_touchcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE); // contour 찾기
-		std::cout << "findcontours " << true_touchcontours.size() << std::endl;
-		//contours_size = contours.size();
-		//std::cout << "set contours size " << contours_size << std::endl;
-
-		cv::Mat grayMat1(false_touchPoint.rows, false_touchPoint.cols, CV_8UC3);
-		std::cout << "grayMat1 create" << std::endl;
-		cv::Mat cannyMat1(false_touchPoint.rows, false_touchPoint.cols, CV_8UC3);
-		std::cout << "cannyMat1 create" << std::endl;
-		cv::cvtColor(false_touchPoint, grayMat1, CV_RGB2GRAY);
-		std::cout << "gray convert" << std::endl;
-		cv::Canny(grayMat1, cannyMat1, 30, 128, 3, false); // contour 찾기위한 cannyedge 작업
-		std::cout << "canny convert" << std::endl;
-		cv::findContours(cannyMat1, false_touchcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE); // contour 찾기
-		std::cout << "findcontours " << false_touchcontours.size() << std::endl;
+		
 	}
 
 	int mKinect::createShadowImage(){ // 이미지 만들기 부분. 이미지를 만들어 png로 저장한다. 만들어진 이미지의 개수를 넘겨준다.
@@ -387,6 +426,8 @@ namespace TestKinect{
 			{
 				std::cout << count++ << " 3process" << std::endl;
 				const RGBQUAD shadow = { 0, 0, 0, 255 };
+
+				const RGBQUAD cwhite = { 255, 255, 255, 255 };
 				// loop over output pixels
 				for (int colorIndex = 0; colorIndex < (nColorWidth*nColorHeight); ++colorIndex)
 				{
@@ -394,6 +435,8 @@ namespace TestKinect{
 					const RGBQUAD* pSrc = m_pBackgroundRGBX + colorIndex;
 
 					const RGBQUAD* pColorSrc = m_pBackgroundRGBX + colorIndex;
+
+					const RGBQUAD* pWhiteSrc = m_pBackgroundRGBX + colorIndex;
 
 					DepthSpacePoint p = m_pDepthCoordinates[colorIndex];
 
@@ -415,6 +458,7 @@ namespace TestKinect{
 								//pSrc = m_pColorRGBX + colorIndex;
 								pSrc = &shadow;
 								pColorSrc = m_pColorRGBX + colorIndex;
+								pWhiteSrc = &cwhite;
 							}
 						}
 					}
@@ -423,6 +467,8 @@ namespace TestKinect{
 					m_pOutputRGBX[colorIndex] = *pSrc;
 					
 					m_pColorFrameRGBX[colorIndex] = *pColorSrc;
+
+					m_pWhiteFrameRGBX[colorIndex] = *pWhiteSrc;
 				}
 				cv::Mat img(cColorHeight, cColorWidth, CV_8UC4,
 					reinterpret_cast<void*>(m_pOutputRGBX));
@@ -432,6 +478,14 @@ namespace TestKinect{
 				cv::Mat img1(cColorHeight, cColorWidth, CV_8UC4, reinterpret_cast<void*>(m_pColorFrameRGBX));
 				mColorCopyMat = img1.clone();
 
+				cv::Mat img2(cColorHeight, cColorWidth, CV_8UC4, reinterpret_cast<void*>(m_pWhiteFrameRGBX));
+				mWhiteMat = img2.clone();
+
+				cv::Mat colorFlip(cColorHeight, cColorWidth, CV_8UC4);
+				cv::Mat whiteFlip(cColorHeight, cColorWidth, CV_8UC4);
+
+				cv::flip(mColorCopyMat, colorFlip, 1);
+				cv::flip(mWhiteMat, whiteFlip, 1);
 
 				std::cout << count++ << " 4process" << std::endl;
 
@@ -463,17 +517,23 @@ namespace TestKinect{
 					//std::cout << "width: " << mrect.width << " height: " << mrect.height << " x: " << mrect.x << " y:" << mrect.y << std::endl;
 					//mat()
 					cv::Mat saveImage;
+					cv::Mat shadow_Tt;
 					//mat(mrect).copyTo(saveImage);
 
-					mColorCopyMat(mrect).copyTo(saveImage);
+					colorFlip(mrect).copyTo(saveImage);
+					whiteFlip(mrect).copyTo(shadow_Tt);
+					
+					//shadow_Tt = ~shadow_Tt.clone();
 
 					std::vector<int> compression_params;
 					compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
 					compression_params.push_back(9);
 
 					char buf[20];
+					char tbuf[20];
 
 					sprintf_s(buf, "picture%d.png", i);
+					sprintf_s(tbuf, "spicture%d.png", i);
 
 					//std::cout << buf << " create" << std::endl;
 
@@ -484,94 +544,22 @@ namespace TestKinect{
 						fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
 						return;
 					}
+
+					try {
+						imwrite(tbuf, shadow_Tt, compression_params);
+					}
+					catch (std::runtime_error& ex) {
+						fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
+						return;
+					}
+
 				}
-				/*std::vector<int> compression_params;
-				compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-				compression_params.push_back(9);
-
-				char buf[20];
-
-				sprintf_s(buf, "picture%d.png", 3);
-
-				try {
-					imwrite(buf, mat, compression_params);
-				}
-				catch (std::runtime_error& ex) {
-					fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
-					return;
-				}*/
-			
-
 			}
 		}
 
 	}
 
 	void mKinect::processIncomingData() {
-		
-		if (!m_pMultiSourceFrameReader)
-		{
-			return;
-		}
-
-		if (depthBuffer != nullptr) {
-			delete[] depthBuffer;
-			depthBuffer = nullptr;
-		}
-
-		IMultiSourceFrame* pMultiSourceFrame = NULL;
-		IDepthFrame* data = NULL;
-		IFrameDescription *frameDesc = nullptr;
-
-		HRESULT hr = m_pMultiSourceFrameReader->AcquireLatestFrame(&pMultiSourceFrame);
-		//std::cout << count++ << " 4번째" << std::endl;
-		if (SUCCEEDED(hr)){
-			IDepthFrameReference*pDepthFrameReference = NULL;
-			//std::cout << hr << "1오류임" << std::endl;
-			hr = pMultiSourceFrame->get_DepthFrameReference(&pDepthFrameReference);
-			if (SUCCEEDED(hr)){
-				//std::cout << hr << "2오류임" << std::endl;
-				hr = pDepthFrameReference->AcquireFrame(&data);
-			}
-			SafeRelease(pDepthFrameReference);
-		}
-
-		//IDepthFrame *data = nullptr;
-		//HRESULT hr = -1;
-		
-		USHORT nDepthMinReliableDistance = 0;
-		USHORT nDepthMaxReliableDistance = 0;
-		int height = 424, width = 512;
-		std::cout << "depth 1" << std::endl;
-		if (SUCCEEDED(hr)) hr = data->get_FrameDescription(&frameDesc);
-		std::cout << "depth 2" << std::endl;
-		if (SUCCEEDED(hr)) hr = data->get_DepthMinReliableDistance(
-			&nDepthMinReliableDistance);
-		std::cout << "depth 3" << std::endl;
-		if (SUCCEEDED(hr)) hr = data->get_DepthMaxReliableDistance(
-			&nDepthMaxReliableDistance);
-		std::cout << "depth 4" << std::endl;
-		if (SUCCEEDED(hr)) {
-			std::cout << "depth 5" << std::endl;
-			if (SUCCEEDED(frameDesc->get_Height(&height)) &&
-				SUCCEEDED(frameDesc->get_Width(&width))) {
-				std::cout << "depth 6" << std::endl;
-				hr = data->CopyFrameDataToArray(cDepthHeight * cDepthWidth, depthBuffer);
-				if (SUCCEEDED(hr)) {
-					std::cout << "depth 7" << std::endl;
-					cv::Mat depthMap = cv::Mat(height, width, CV_16U, depthBuffer);
-					cv::Mat img0 = cv::Mat::zeros(height, width, CV_8UC1);
-					cv::Mat img1;
-					double scale = 255.0 / (nDepthMaxReliableDistance -
-						nDepthMinReliableDistance);
-					depthMap.convertTo(img0, CV_8UC1, scale);
-					//cv::applyColorMap(img0, img1, cv::COLORMAP_JET);
-					//cv::imshow("Depth Only", img1);
-					mDepthMat = img0.clone();
-				}
-			}
-		}
-		SafeRelease(data);
 		
 	}
 
@@ -655,11 +643,62 @@ namespace TestKinect{
 		mDepthMat = adaptive.clone();
 	}
 
+	void mKinect::createContoursDiffMat(){
+		// threshold
+		cv::Mat tempMat(cDepthHeight, cDepthWidth, CV_8UC3);
+		cv::Mat cannyMat(cDepthHeight, cDepthWidth, CV_8UC3);
+		cv::Mat adaptive(cDepthHeight, cDepthWidth, CV_8UC1);
+
+		//adaptive = mDepthMat.clone();
+
+		//cv::cvtColor(diffMat, tempMat, CV_GRAY2BGR);
+
+		cv::Mat element5(5, 5, CV_8U, cv::Scalar(1));
+		cv::morphologyEx(diffMat, diffMat, cv::MORPH_CLOSE, element5); // blur 처리한 이미지를 morphology연산하기, 노이즈 제거 작업.
+
+		cv::Canny(diffMat, cannyMat, 30, 128, 3, false); // contour 찾기위한 cannyedge 작업
+		cv::findContours(cannyMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE); // contour 찾기
+	}
+
 	long mKinect::getContoursCenterLen(){ //contours center의 길이를 넘겨준다.
 		return contours.size();
 	}
 
+	void mKinect::KinectgetContours(POINT*list,long len){
+		/*for (int i = 0; i < contours.size(); ++i){
+			if (100 < contours[i].size())
+				std::cout << i << " size : " << contours[i].size() << std::endl;
+		}*/
+		for (int i = 0; i < CONTOURSIZE * CONTOURLEN; ++i){
+			list[i].x = 0;
+			list[i].y = 0;
+			
+		}
+		len = 0;
+		for (int i = 0; i < contours.size(); ++i){
+			if (CONTOURSIZE == i)
+				break;
+			for (int j = 0; j < contours[i].size(); ++j){
+				if (j % 10 == 0 && j < CONTOURLEN){
+					if (cutRect.x <= contours[i][j].x && contours[i][j].x <= cutRect.x + cutRect.width && cutRect.y <= contours[i][j].y && contours[i][j].y < cutRect.y + cutRect.height){
+						list[len].x = contours[i][j].x;
+						list[len].y = contours[i][j].y;
+						
+						len += 1;
+					}
+				}
+			}
+			
+		}
+		//std::cout << "len : " <<  len << std::endl;
+		contoursCount = len;
+	}
+
 	void mKinect::getContoursCenter(){	// contours center 를 넘겨준다.
+		for (int i = 0; i < contours.size(); ++i){
+			if (100 < contours[i].size())
+				std::cout << i << " size : " << contours[i].size() << std::endl;
+		}
 		for (int i = 0; i < 255; ++i){
 			mContoursCenter[i].x = 0;
 			mContoursCenter[i].y = 0;
@@ -687,230 +726,241 @@ namespace TestKinect{
 			if (count_x != 0){
 				mContoursCenter[i].x = (float)((float)(mContoursCenter[i].x / count_x) - cutRect.x) / (cutRect.width) * cDepthWidth; // 지정한 범위를 바탕으로 컨투어 비율계산.
 				//mContoursCenter[i].x = mContoursCenter[i].x / count_x;
-				std::cout << "x = " << mContoursCenter[i].x << std::endl;
+				//std::cout << "x = " << mContoursCenter[i].x << std::endl;
 			}
 			else
 				mContoursCenter[i].x = 0;
 			if (count_y != 0){
 				mContoursCenter[i].y = (float)((float)(mContoursCenter[i].y / count_y) - cutRect.y) / (cutRect.height) * cDepthHeight; // 지정한 범위를 바탕으로 컨투어 비율계산.
 				//mContoursCenter[i].y = mContoursCenter[i].y / count_y;
-				std::cout << "y = " << mContoursCenter[i].y << std::endl;
+				//std::cout << "y = " << mContoursCenter[i].y << std::endl;
 			}
 			else
 				mContoursCenter[i].y = 0;
 		}
 	}
 
+	void mKinect::CreateBG(){
+		int bgcount = 0;
+
+		while (bgcount != BGCOUNT){
+			std::cout << bgcount << " 번 돌았음" << std::endl;
+			Sleep(60);
+			if (!m_pMultiSourceFrameReader)
+			{
+				std::cout << "multisourceFrameReader nullptr" << std::endl;
+				return;
+			}
+			IMultiSourceFrame* pMultiSourceFrame = NULL;
+			IDepthFrame* pDepthFrame = NULL;
+
+			HRESULT hr = m_pMultiSourceFrameReader->AcquireLatestFrame(&pMultiSourceFrame);
+
+			if (SUCCEEDED(hr)){
+				IDepthFrameReference*pDepthFrameReference = NULL;
+				//std::cout << hr << "1오류임" << std::endl;
+				hr = pMultiSourceFrame->get_DepthFrameReference(&pDepthFrameReference);
+				if (SUCCEEDED(hr)){
+					//std::cout << hr << "2오류임" << std::endl;
+					hr = pDepthFrameReference->AcquireFrame(&pDepthFrame);
+				}
+				SafeRelease(pDepthFrameReference);
+			}
+			if (SUCCEEDED(hr))
+			{
+				int nDepthWidth = 0;
+				int nDepthHeight = 0;
+				UINT nDepthBufferSize = 0;
+				UINT16*pDepthBuffer = NULL;
+				//std::cout << "depth image create start" << std::endl;
+				hr = pDepthFrame->AccessUnderlyingBuffer(&nDepthBufferSize, &pDepthBuffer);
+
+				if (SUCCEEDED(hr)) {
+					cv::Mat depthMap = cv::Mat(cDepthHeight, cDepthWidth, CV_16U, pDepthBuffer);
+					depthMap.convertTo(mDepthMat, CV_8UC1, 255.0f / 8000.0f, 0.0f);
+
+					AddMat[bgcount] = mDepthMat;
+
+					bgcount += 1;
+					//std::cout << "depth image create end" << std::endl;
+				}
+			}
+			SafeRelease(pDepthFrame);
+			SafeRelease(pMultiSourceFrame);
+		}
+		for (int i = 0; i < cDepthHeight; ++i){
+			for (int j = 0; j < cDepthWidth; ++j){
+				int value = 0;
+				for (int index = 0; index < BGCOUNT; ++index){
+					value += *AddMat[index].ptr(i, j);
+				}
+				*bgMat.ptr(i, j) = value / BGCOUNT;
+			}
+		}
+	}
+
+	long mKinect::CheckBG(const char*filename){
+
+		const char buf[20] = "bg.png";
+		cv::Mat bg = cv::imread(buf);
+		std::cout << buf << " this name " << std::endl;
+		if (bg.cols <= 0 || bg.rows <= 0){ // 기준 평균 배경화면이 없을때. 생성을 하자.
+			int bgcount = 0;
+			while (bgcount != BGCOUNT){
+				std::cout << bgcount << " 번 돌았음" << std::endl;
+				Sleep(60);
+				if (!m_pMultiSourceFrameReader)
+				{
+					std::cout << "multisourceFrameReader nullptr" << std::endl;
+					return 0;
+				}
+				IMultiSourceFrame* pMultiSourceFrame = NULL;
+				IDepthFrame* pDepthFrame = NULL;
+
+				HRESULT hr = m_pMultiSourceFrameReader->AcquireLatestFrame(&pMultiSourceFrame);
+
+				if (SUCCEEDED(hr)){
+					IDepthFrameReference*pDepthFrameReference = NULL;
+					//std::cout << hr << "1오류임" << std::endl;
+					hr = pMultiSourceFrame->get_DepthFrameReference(&pDepthFrameReference);
+					if (SUCCEEDED(hr)){
+						//std::cout << hr << "2오류임" << std::endl;
+						hr = pDepthFrameReference->AcquireFrame(&pDepthFrame);
+					}
+					SafeRelease(pDepthFrameReference);
+				}
+				if (SUCCEEDED(hr))
+				{
+					int nDepthWidth = 0;
+					int nDepthHeight = 0;
+					UINT nDepthBufferSize = 0;
+					UINT16*pDepthBuffer = NULL;
+					//std::cout << "depth image create start" << std::endl;
+					hr = pDepthFrame->AccessUnderlyingBuffer(&nDepthBufferSize, &pDepthBuffer);
+
+					if (SUCCEEDED(hr)) {
+						cv::Mat depthMap = cv::Mat(cDepthHeight, cDepthWidth, CV_16U, pDepthBuffer);
+						depthMap.convertTo(mDepthMat, CV_8UC1, 255.0f / 8000.0f, 0.0f);
+
+						AddMat[bgcount] = mDepthMat;
+
+						bgcount += 1;
+						//std::cout << "depth image create end" << std::endl;
+					}
+				}
+				SafeRelease(pDepthFrame);
+				SafeRelease(pMultiSourceFrame);
+			}
+			for (int i = 0; i < cDepthHeight; ++i){
+				for (int j = 0; j < cDepthWidth; ++j){
+					int value = 0;
+					for (int index = 0; index < BGCOUNT; ++index){
+						value += *AddMat[index].ptr(i, j);
+					}
+					*bgMat.ptr(i, j) = value / BGCOUNT;
+				}
+			}
+			std::cout << "file create before" << std::endl;
+			//bg = bgMat.clone();
+			//std::cout << filepath << " read fail. create file " << filepath << std::endl;
+			/*std::vector<int> compression_params;
+			compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
+			compression_params.push_back(9);*/
+
+			//return false;
+			//char buf[20];
+			//sprintf_s(buf, "picture.png");
+			try {
+				//std::cout << "this error" << std::endl;
+				cv::imwrite(buf, bgMat);
+			}
+			catch (std::runtime_error& ex) {
+				fprintf(stderr, "Exception converting image to PNG format: %s\n", ex.what());
+				std::cout << "bgImage file create error" << std::endl;
+				return 0;
+			}
+			std::cout << "file create after" << std::endl;
+		}
+		else{
+			Sleep(7000);
+			//CreateBG();
+			bgMat = cv::imread(buf);
+			std::cout << "bgMat Data" << std::endl;
+			std::cout << "cols : " << bgMat.cols << "rows : " << bgMat.rows << std::endl;
+		}
+		return 1;
+	}
+
 	void mKinect::AddBackGround(){
-		// color이미지 만들기 부터!!!
+		
+	}
 
-		//int colorwidth = 0;
-		//int colorheight = 0;
-		//pcolorDescription->get_Width(&colorwidth); // 1920
-		//pcolorDescription->get_Height(&colorheight); // 1080
-		//unsigned int colorbufferSize = colorwidth * colorheight * 4 * sizeof(unsigned char);
+	void mKinect::DiffMat(){
+		std::cout << "here 1" << std::endl;
+		cv::absdiff(mDepthMat, bgMat, diffMat);
+		//cv::absdiff(bgMat, mDepthMat, diffMat);
+		std::cout << "here 22" << std::endl;
+		for (int i = 0; i < cDepthHeight; ++i){
+			for (int j = 0; j < cDepthWidth; ++j){
+				if (2 < *diffMat.ptr(i, j) && *diffMat.ptr(i, j) < 20){
+					*diffMat.ptr(i, j) = 0;
+				}
+				else{
+					*diffMat.ptr(i, j) = 255;
+				}
+			}
+		}
+	}
 
-		//cv::Mat colorbufferMat(colorheight, colorwidth, CV_8UC4);
-		//cv::Mat colorMat(colorheight / 2, colorwidth / 2, CV_8UC4);
-		//cv::namedWindow("Color");
+	long mKinect::getContoursLen(){
+		return contours.size();
+	}
 
-		//int width = 0;
-		//int height = 0;
-		//pDescription->get_Width(&width); // 512
-		//pDescription->get_Height(&height); // 424
-		//unsigned int bufferSize = width * height * sizeof(unsigned short);
+	void mKinect::contoursRect(POINT*center,POINT*r){		//비율 조절합ㄴ시다.
+		int count = 0;
+		for (int i = 0; i < contours.size(); ++i){
+			int minx = 10000;
+			int miny = 10000;
+			int maxx = 0;
+			int maxy = 0;
+			bool create = false;
+			for (int j = 0; j < contours[i].size(); ++j){
+				if (cutRect.x /*0*/ <= contours[i][j].x && contours[i][j].x <= cutRect.x + cutRect.width /*512*/ && cutRect.y/*0*/ <= contours[i][j].y && contours[i][j].y < cutRect.y + cutRect.height/*424*/){
+					create = true;
+					contours[i][j].x = (float)((float)(contours[i][j].x) - cutRect.x) / (cutRect.width) * cDepthWidth;
+					contours[i][j].y = (float)((float)(contours[i][j].y) - cutRect.y) / (cutRect.height) * cDepthHeight;
 
-		//// Range ( Range of Depth is 500-8000[mm], Range of Detection is 500-4500[mm] ) 
-		//unsigned short min = 0;
-		//unsigned short max = 0;
-		//pDepthSource->get_DepthMinReliableDistance(&min); // 500
-		//pDepthSource->get_DepthMaxReliableDistance(&max); // 4500
-		//std::cout << "Range : " << min << " - " << max << std::endl;
+					if (maxx <= contours[i][j].x){
+						maxx = contours[i][j].x;
+					}
 
-		//cv::Mat bufferMat(height, width, CV_16UC1);
-		//cv::Mat depthMat(height, width, CV_8UC1);
-		//cv::Mat whiteThreshold(height, width, CV_8UC1);
-		//cv::Mat blackThreshold(height, width, CV_8UC1);
-		//cv::Mat blobMat(height, width, CV_8UC1);
+					if (contours[i][j].x <= minx){
+						minx = contours[i][j].x;
+					}
 
-		//cv::Mat testMat(height, width, CV_8UC1);
+					if (maxy <= contours[i][j].y){
+						maxy = contours[i][j].y;
+					}
 
-		//cv::Mat cutMat(height, width, CV_8UC1);
-		//cv::Mat pictureMat(height, width, CV_8UC1);
-		//cv::Mat cutMatclone(height, width, CV_8UC1);
+					if (contours[i][j].y <= miny){
+						miny = contours[i][j].y;
+					}
+				}
+			}
+			if (create){
+				center[count].x = (maxx - minx) / 2 + minx;
+				center[count].y = (maxy - miny) / 2 + miny;
 
-		//cv::Mat tempMat(height, width, CV_8UC4);
-		//cv::Mat cannyMat(height, width, CV_8UC4);
-		//cv::Mat adaptive(height, width, CV_8UC1);
-		//cv::Mat pleaseHelp(height, width, CV_8UC4);
+				r[count].x = (maxx - minx) / 2;
+				r[count].y = (maxy - miny) / 2;
+				count += 1;
+			}
+			std::cout << "center = " << center[i].x << " " << center[i].y << std::endl;
+			std::cout << "r = " << r[i].x << " " << r[i].y << std::endl;
+		}
 
-		//cv::Mat element5(3, 3, CV_8U, cv::Scalar(1));
-
-		//cv::namedWindow("whiteThreshold");
-		//cv::namedWindow("blackThreshold");
-		////cv::namedWindow("blob");
-
-		//cv::namedWindow("Depth");
-
-		//cv::namedWindow("Adaptive");
-		////cv::namedWindow("CutClone");
-		////cv::namedWindow("Cut");
-		//cv::namedWindow("Picture");
-
-		//cv::namedWindow("temp");
-
-
-		//cutMat = cv::Mat::zeros(cutMat.rows, cutMat.cols, CV_8UC1);
-		//tempMat = cv::Mat::zeros(tempMat.rows, tempMat.cols, CV_8UC3);
-
-		//cv::setMouseCallback("Depth", CallBackFunc, NULL);
-		//cvCreateTrackbar("threshold", "Depth", &threshold, 255, NULL);
-
-		//while (1){
-		//	// Frame
-		//	Sleep(30);
-		//	IDepthFrame* pDepthFrame = nullptr;
-		//	hResult = pDepthReader->AcquireLatestFrame(&pDepthFrame);
-		//	if (SUCCEEDED(hResult)){
-		//		hResult = pDepthFrame->AccessUnderlyingBuffer(&bufferSize, reinterpret_cast<UINT16**>(&bufferMat.data));
-		//		if (SUCCEEDED(hResult)){
-		//			bufferMat.convertTo(depthMat, CV_8U, -255.0f / 8000.0f, 255.0f);
-
-		//			cv::threshold(depthMat, whiteThreshold, threshold, 255, CV_THRESH_BINARY);
-		//			cv::threshold(depthMat, blackThreshold, threshold, 255, CV_THRESH_BINARY_INV);
-
-		//			cv::medianBlur(whiteThreshold, whiteThreshold, 3);
-
-		//			//cv::medianBlur(blackThreshold, blackThreshold, 5);
-		//			//cv::threshold(blackThreshold, blobMat, 1, 255, CV_THRESH_BINARY_INV);
-
-		//			if (takePicture){
-		//				pictureMat = whiteThreshold.clone();
-		//				takePicture = false;
-		//			}
-
-		//			pictureMat(cutrect).copyTo(cutMat);
-		//			cutMatclone = cutMat.clone();
-		//			//blobMat = whiteThreshold.clone();
-		//			IplImage* img = new IplImage(cutMat);
-		//			blob.SetParam(img, 100);
-		//			blob.DoLabeling();
-		//			//blob.BlobBigSizeConstraint(cutMat.cols * 0.8, cutMat.rows * 0.8);
-		//			blob.BlobSmallSizeConstraint(15, 15);
-
-		//			//depthMat.copyTo(cutMat(cutrect));
-
-		//			//cv::Mat img1(h, w, CV_32FC1);
-		//			//Mat img2;
-		//			//img1.convertTo(img2, CV_8U);
-		//			//cvtColor(human_img, gray_img, CV_BGR2GRAY);
-		//			//cutMat.convertTo(tempMat, CV_GRAY2BGR);
-
-		//			cv::cvtColor(cutMat, tempMat, CV_GRAY2BGR);	//흑백 매트에 컬러값을 넣기위한 변환.
-
-		//			cv::medianBlur(tempMat, tempMat, 5); // contour할 이미지에 노이즈 없애기.
-		//			cv::morphologyEx(tempMat, tempMat, cv::MORPH_CLOSE, element5); // blur 처리한 이미지를 morphology연산하기, 노이즈 제거 작업.
-
-		//			//cvAdaptiveThreshold(src_gray, addap_thr, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 21, 10);
-		//			//cv::adaptiveThreshold(cutMat, adaptive, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 21, 10);
-
-
-		//			cv::Canny(tempMat, cannyMat, 30, 128, 3, false); // contour 찾기위한 cannyedge 작업
-		//			cv::findContours(cannyMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE); // contour 찾기
-		//			cv::drawContours(tempMat, contours, -1, cv::Scalar(0, 0, 255), 1);				  // contour 그리기
-
-
-
-		//			CvRect* rect = blob.m_recBlobs;
-
-		//			char textBuffer[100] = { 0 };
-		//			for (int i = 0; i < blob.m_nBlobs; ++i){
-		//				cv::rectangle(tempMat, rect[i], cv::Scalar(255, 0, 0), 1);
-		//				sprintf_s(textBuffer, "Num:%d", i);
-		//				putText(tempMat, textBuffer, cv::Point(rect[i].x + rect[i].width / 4, rect[i].y + rect[i].height / 2), cv::FONT_HERSHEY_SIMPLEX, .6, cv::Scalar(255, 0, 255), 2);
-		//			}
-		//			if (once){
-		//				for (int i = 0; i < contours.size(); ++i){
-		//					std::cout << "contours[" << i << "] : " << contours[i].size() << "  area : " << cv::contourArea(contours[i]) << std::endl;
-		//					/*if (30 < contours[i].size()){
-		//					cv::drawContours(tempMat, contours[i], -1, cv::Scalar(0, 255, 255), 2);
-		//					}*/
-		//				}
-		//				once = false;
-		//				adaptive = depthMat.clone();
-		//				//cv::Canny(adaptive, cannyMat, 30, 128, 3, false); // contour 찾기위한 cannyedge 작업
-		//				//cv::findContours(cannyMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE); // contour 찾기
-		//				for (int i = 0; i < adaptive.cols; ++i){
-		//					for (int j = 0; j < adaptive.rows; ++j){
-		//						if (150 < *adaptive.ptr(j, i) && *adaptive.ptr(j, i) < 185){
-		//							testcount += 1;
-		//							*adaptive.ptr(j, i) = 0;
-		//						}
-		//						else{
-		//							*adaptive.ptr(j, i) = 255;
-		//						}
-		//					}
-		//				}
-
-		//				cv::medianBlur(adaptive, adaptive, 5);
-		//				cv::cvtColor(adaptive, pleaseHelp, CV_GRAY2BGR);	//흑백 매트에 컬러값을 넣기위한 변환.
-		//				//cv::medianBlur(pleaseHelp, pleaseHelp, 5);
-
-		//				for (int i = 0; i < adaptive.cols; ++i){
-		//					for (int j = 0; j < adaptive.rows; ++j){
-		//						if (*adaptive.ptr(j, i)){
-		//							*adaptive.ptr(j, i) = 0;
-		//						}
-		//						else{
-		//							*adaptive.ptr(j, i) = 255;
-		//						}
-		//					}
-		//				}
-
-		//				IplImage* _img = new IplImage(adaptive);
-		//				realBlob.SetParam(_img, 100);
-		//				realBlob.DoLabeling();
-		//				//blob.BlobBigSizeConstraint(cutMat.cols * 0.8, cutMat.rows * 0.8);
-		//				realBlob.BlobSmallSizeConstraint(15, 15);
-
-		//				cv::Canny(pleaseHelp, cannyMat, 30, 128, 3, false); // contour 찾기위한 cannyedge 작업
-		//				cv::findContours(cannyMat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE); // contour 찾기
-		//				cv::drawContours(pleaseHelp, contours, -1, cv::Scalar(0, 0, 255), 1);				  // contour 그리기
-
-		//				sprintf_s(textBuffer, "contours:%d", contours.size());
-		//				putText(pleaseHelp, textBuffer, cv::Point(0, 20), cv::FONT_HERSHEY_SIMPLEX, .6, cv::Scalar(255, 0, 255), 2);
-
-		//				CvRect* _rect = realBlob.m_recBlobs;
-		//				//char _textBuffer[100] = { 0 };
-		//				for (int i = 0; i < realBlob.m_nBlobs; ++i){
-		//					cv::rectangle(pleaseHelp, _rect[i], cv::Scalar(255, 0, 0), 1);
-		//					sprintf_s(textBuffer, "Num:%d", i);
-		//					putText(pleaseHelp, textBuffer, cv::Point(_rect[i].x + _rect[i].width / 4, _rect[i].y + _rect[i].height / 2), cv::FONT_HERSHEY_SIMPLEX, .6, cv::Scalar(255, 0, 255), 2);
-		//				}
-
-		//				std::cout << "testValue : " << testcount << std::endl;
-		//				//cv::adaptiveThreshold(tempMat, tempMat, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, 21, 10);
-		//			}
-
-		//			sprintf_s(textBuffer, "contours:%d", contours.size());
-		//			putText(tempMat, textBuffer, cv::Point(0, 20), cv::FONT_HERSHEY_SIMPLEX, .6, cv::Scalar(255, 0, 255), 2);
-
-		//		}
-		//	}
-		//	SafeRelease(pDepthFrame);
-
-		//	// Frame
-		//	IColorFrame* pColorFrame = nullptr;
-		//	hResult = pColorReader->AcquireLatestFrame(&pColorFrame);
-		//	if (SUCCEEDED(hResult)){
-		//		//std::cout << "colorReader" << std::endl;
-		//		hResult = pColorFrame->CopyConvertedFrameDataToArray(colorbufferSize, reinterpret_cast<BYTE*>(colorbufferMat.data), ColorImageFormat::ColorImageFormat_Bgra);
-		//		if (SUCCEEDED(hResult)){
-		//			cv::resize(colorbufferMat, colorMat, cv::Size(), 0.5, 0.5);
-		//			//std::cout << "color" << std::endl;
-		//		}
-		//	}
-		//	SafeRelease(pColorFrame);
+		//contoursCount = contours.size();
+		rectCount = count;
 	}
 
 	bool mKinect::getCurrentFrame(){ /// 프레임 업데이트 하기.
@@ -1199,21 +1249,12 @@ void InitKinect(){
 void getContoursCenter(POINT*list, long len, long render){
 	//getImageContoursCenter
 	//POINT* mlist = val.getContoursCenter();	//공간이 확실해야됨!!!
+	val.createContoursDiffMat();
 	val.getContoursCenter();
 	for (int i = 0; i < len; ++i){
 		list[i].x = val.mContoursCenter[i].x;
 		list[i].y = val.mContoursCenter[i].y;
 	}
-	/*for (int i = 0; i < len; ++i){
-		std::cout << "mlist : " << mlist[i].x << " , " << mlist[i].y << std::endl;
-	}
-	for (int i = 0; i < len; ++i){
-		std::cout << "list : " << list[i].x << " , " << list[i].y << std::endl;
-	}
-
-	if (mlist != nullptr){
-		delete[] list;
-	}*/
 	if (render == 1){
 		val.print();
 	}
@@ -1235,5 +1276,142 @@ long ContoursCenterLen(){
 }
 
 void CreateRect(){
+	val.getDepthImage();
 	val.print();
+}
+
+void DepthImageUpdate(){
+	val.getDepthImage();
+	std::cout << "hello1" << std::endl;
+	val.DiffMat();
+	std::cout << "hello2" << std::endl;
+	//val.createContoursDiffMat();
+}
+
+void BGCreate(){
+	val.CreateBG();
+}
+
+long CheckBG(){
+	return val.CheckBG("aa");
+}
+
+long getContoursLen(){	//contours 넘기는
+	return val.contoursCount;
+}
+void getContours(POINT*list, long len, long render){
+	val.createContoursDiffMat();
+	val.KinectgetContours(list,len);
+}
+
+void closeCVwindow(){
+	val.closeWindow();
+}
+
+void getContoursRect(POINT*center, POINT*r){
+	val.createContoursDiffMat();
+	val.contoursRect(center, r);
+	center[0].x = 100;
+	center[0].y = 200;
+}
+
+long getContourRectCount(){
+	return val.rectCount;
+}
+
+////////////////////////////////////////////////// unity test
+int unityReturnint(){
+	int ret = 10;
+	return ret;
+}
+int* unityReturnintPointer(){
+	int arr[10];
+	for (int i = 0; i < 10; ++i){
+		arr[i] = i;
+	}
+	return arr;
+}
+
+void unityGetPOINT(POINT* list){
+	for (int i = 0; i < 10; ++i){
+		list[i].x = i;
+		list[i].y = i;
+	}
+}
+POINT* unityReturnPOINT(){
+	POINT* arr = new POINT[10];
+	for (int i = 0; i < 10; ++i){
+		arr[i].x = i;
+		arr[i].y = i;
+	}
+	return arr;
+}
+
+int init(){
+	return val.InitKinect();
+}
+
+int closeKinect(){
+	val.Finalize();
+	return 1;
+}
+
+POINT getRectWidth(){
+	POINT a;
+	a.x = cutRect.width;
+	a.y = cutRect.height;
+	return a;
+}
+
+void UnityRect(POINT*center, POINT*r){
+	val.createContoursDiffMat();
+	//val.contoursRect(center, r);
+	int count = 0;
+	for (int i = 0; i < val.contours.size(); ++i){
+		int minx = 10000;
+		int miny = 10000;
+		int maxx = 0;
+		int maxy = 0;
+		bool create = false;
+		for (int j = 0; j < val.contours[i].size(); ++j){
+			if (cutRect.x /*0*/ <= val.contours[i][j].x && val.contours[i][j].x <= cutRect.x + cutRect.width /*512*/ && cutRect.y/*0*/ <= val.contours[i][j].y && val.contours[i][j].y < cutRect.y + cutRect.height/*424*/){
+				create = true;
+				val.contours[i][j].x = (float)((float)(val.contours[i][j].x) - cutRect.x) / (cutRect.width) * 512;
+				val.contours[i][j].y = (float)((float)(val.contours[i][j].y) - cutRect.y) / (cutRect.height) * 424;
+
+				if (maxx <= val.contours[i][j].x){
+					maxx = val.contours[i][j].x;
+				}
+
+				if (val.contours[i][j].x <= minx){
+					minx = val.contours[i][j].x;
+				}
+
+				if (maxy <= val.contours[i][j].y){
+					maxy = val.contours[i][j].y;
+				}
+
+				if (val.contours[i][j].y <= miny){
+					miny = val.contours[i][j].y;
+				}
+			}
+		}
+		if (create){
+			center[count].x = (maxx - minx) / 2 + minx;
+			center[count].y = (maxy - miny) / 2 + miny;
+
+			r[count].x = (maxx - minx) / 2;
+			r[count].y = (maxy - miny) / 2;
+			count += 1;
+		}
+		std::cout << "center = " << center[i].x << " " << center[i].y << std::endl;
+		std::cout << "r = " << r[i].x << " " << r[i].y << std::endl;
+	}
+
+	//contoursCount = contours.size();
+	val.rectCount = count;
+}
+
+int getRectCount(){
+	return val.rectCount;
 }
